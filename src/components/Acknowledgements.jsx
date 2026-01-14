@@ -27,7 +27,7 @@ const Acknowledgements = () => {
                     Estamos muy emocionados de compartir este día con ustedes.
                 </p>
                 <p className="text-sm opacity-70">
-                    Con amor, Emma & Simón
+                    Con amor, Simón & Emma
                 </p>
             </div>
         </footer>
