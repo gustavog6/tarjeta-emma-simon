@@ -78,7 +78,7 @@ const EventCards = () => {
                             <div className="mt-auto flex gap-4">
                                 <button
                                     onClick={() => openMap(event)}
-                                    className="flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-full hover:bg-yellow-600 transition-colors shadow-md cursor-pointer"
+                                    className="flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-full hover:bg-secondary transition-colors shadow-md cursor-pointer"
                                 >
                                     <MapPin size={18} />
                                     Ver Mapa

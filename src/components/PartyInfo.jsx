@@ -60,7 +60,7 @@ const PartyInfo = () => {
                         href="https://wa.me/+584249743171?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda%20de%20Emma%20y%20Simón. Soy: "
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-yellow-600 transition-colors font-bold shadow-md hover:shadow-lg"
+                        className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-secondary transition-colors font-bold shadow-md hover:shadow-lg"
                     >
                         Confirmar por WhatsApp
                     </a>
@@ -84,7 +84,7 @@ const PartyInfo = () => {
                     <a
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-yellow-600 transition-colors font-bold shadow-md hover:shadow-lg w-fit mt-4 mx-auto"
+                        className="inline-flex items-center justify-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-secondary transition-colors font-bold shadow-md hover:shadow-lg w-fit mt-4 mx-auto"
                     >
                         Ver datos bancarios
                     </a>
