@@ -47,7 +47,7 @@ const Countdown = () => {
             </div>
             <div className="max-w-4xl mx-auto text-center">
                 <motion.p
-                    className="font-heading text-3xl text-primary mb-8"
+                    className="font-heading text-5xl text-primary mb-8"
                     initial={{ opacity: 0 }}
                     whileInView={{ opacity: 1 }}
                     viewport={{ once: true }}
@@ -65,7 +65,7 @@ const Countdown = () => {
                             viewport={{ once: true }}
                             transition={{ delay: index * 0.1 }}
                         >
-                            <div className="text-xl md:text-5xl font-bold text-gray-700 font-heading leading-none">
+                            <div className="text-xl md:text-5xl font-bold text-gray-500 font-heading leading-none">
                                 {String(value).padStart(2, '0')}
                             </div>
                             <div className="text-[10px] md:text-sm uppercase tracking-wider text-primary mt-1">

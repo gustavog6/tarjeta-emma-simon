@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import goldSilhouette from '../assets/corazon-turquesa-solo.png';
 
 const Hero = () => {
     return (
@@ -7,7 +8,9 @@ const Hero = () => {
             {/* Background with Overlay */}
             <div className="absolute inset-0 z-0">
                 <img
-                    src="/images/bg-texture.png"
+                    src="/images/bg-texture-turquesa-clean.png"
+                    style={{ opacity: 1 }}
+                    // src="/images/bg-texture.png"
                     alt="Emma & Simón"
                     className="w-full h-full object-cover"
                 />
@@ -30,33 +33,46 @@ const Hero = () => {
                 >
                     <div className="mb-6">
                         <span className="inline-block py-1 px-3 border border-white/30 rounded-full text-sm uppercase tracking-[0.2em] backdrop-blur-sm bg-white/10">
-                            ¡Nos casamos!
+                            Nos casamos
                         </span>
                     </div>
                     <h1 className="font-heading text-6xl md:text-8xl lg:text-9xl mb-6 text-white drop-shadow-xl">
-                        Emma & Simón
+                        Simón & Emma
                     </h1>
 
                     <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 font-body text-lg md:text-xl tracking-widest uppercase text-white/90">
                         <span className="flex items-center gap-2">
-                            <span className="w-8 h-[1px] bg-white/60"></span>
+                            <span className="w-4 h-[1px] bg-white/60"></span>
                             Sábado
                         </span>
-                        <span className="text-3xl font-bold bg-white/10 backdrop-blur-md py-2 px-6 rounded-lg border border-white/20">
+                        <span className="text-5xl font-heading py-2 px-6 text-primary font-bold opacity-80">
                             31 . 01 . 26
                         </span>
                         <span className="flex items-center gap-2">
                             2:00 PM
-                            <span className="w-8 h-[1px] bg-white/60"></span>
+                            <span className="w-4 h-[1px] bg-white/60"></span>
                         </span>
                     </div>
+
+                    <div></div>
                 </motion.div>
+
+                <div className="mt-8 flex justify-center">
+                    <motion.img
+                        src={goldSilhouette}
+                        alt="Golden Silhouette"
+                        className="w-72 md:w-80 opacity-90 drop-shadow-lg"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 0.75, scale: 1 }}
+                        transition={{ delay: 0.8, duration: 1 }}
+                    />
+                </div>
             </div>
 
             <motion.div
                 className="absolute bottom-10 left-0 right-0 flex justify-center z-10"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: 0.5 }}
                 transition={{ delay: 1.5, duration: 1 }}
             >
                 <div className="animate-bounce text-primary">

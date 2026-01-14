@@ -1,4 +1,5 @@
-import React from 'react';
+
+import silhouetteWhite from '../assets/silueta de pareja wh.png';
 
 const Acknowledgements = () => {
     return (
@@ -18,7 +19,10 @@ const Acknowledgements = () => {
             </div>
 
             <div className="max-w-2xl mx-auto px-6 relative z-10">
-                <h2 className="font-heading text-5xl mb-6">¡Gracias!</h2>
+                <div className="flex justify-center">
+                    <img src={silhouetteWhite} alt="Silueta Pareja" className="w-32 h-auto opacity-90" />
+                </div>
+                {/* <h2 className="font-heading text-5xl mb-6">¡Gracias!</h2> */}
                 <p className="text-lg md:text-xl font-light opacity-90 mb-8">
                     Estamos muy emocionados de compartir este día con ustedes.
                 </p>

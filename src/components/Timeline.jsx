@@ -1,24 +1,29 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Church, Utensils, Music } from 'lucide-react';
+import { Church, Utensils, Music, MapPin } from 'lucide-react';
 
 const Timeline = () => {
     const items = [
         {
-            time: '10:00 AM',
+            time: '11:30 AM',
+            title: 'Llegada',
+            icon: <MapPin className="w-5 h-5 md:w-8 md:h-8 text-primary" />
+        },
+        {
+            time: '12:00 M',
             title: 'Ceremonia Religiosa',
             icon: <Church className="w-5 h-5 md:w-8 md:h-8 text-primary" />
         },
         {
-            time: '12:00 PM',
-            title: 'Almuerzo',
+            time: '01:00 PM',
+            title: 'Brindis & Almuerzo',
             icon: <Utensils className="w-5 h-5 md:w-8 md:h-8 text-primary" />
         },
-        {
-            time: '08:00 PM',
-            title: 'Comienza la Fiesta',
-            icon: <Music className="w-5 h-5 md:w-8 md:h-8 text-primary" />
-        },
+        // {
+        //     time: '08:00 PM',
+        //     title: 'Comienza la Fiesta',
+        //     icon: <Music className="w-5 h-5 md:w-8 md:h-8 text-primary" />
+        // },
     ];
 
     return (
@@ -43,7 +48,7 @@ const Timeline = () => {
             </div>
 
             <div className="max-w-4xl mx-auto relative z-10">
-                <h2 className="text-4xl text-center font-heading text-primary mb-16">Itinerario</h2>
+                <h2 className="text-5xl text-center font-heading text-primary mb-16">Itinerario</h2>
 
                 <div className="relative py-12">
                     {/* Central Line */}
@@ -63,7 +68,7 @@ const Timeline = () => {
                                 {/* Text Content - occupies 50% width on desktop */}
                                 <div className={`w-full md:w-1/2 pl-20 md:pl-0 ${idx % 2 === 0 ? 'md:text-left md:pl-16' : 'md:text-right md:pr-16'} mb-4 md:mb-0 box-border`}>
                                     <span className="text-3xl font-heading text-primary block mb-1">{item.time}</span>
-                                    <span className="text-xl text-gray-800 font-bold tracking-wide">{item.title}</span>
+                                    <span className="text-xl text-gray-500 font-bold tracking-wide">{item.title}</span>
                                 </div>
 
                                 {/* Center Icon */}

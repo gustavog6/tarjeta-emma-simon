@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Gift, UserRound } from 'lucide-react'; // Changed icons
 import GiftModal from './GiftModal';
+import vestido from '../assets/vestido.png';
+import camisa from '../assets/camisa.png';
 
 const PartyInfo = () => {
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
@@ -18,29 +20,26 @@ const PartyInfo = () => {
                     <div className="bg-secondary/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
                         <UserRound size={32} />
                     </div>
-                    <h3 className="text-2xl mb-2 font-heading">Código de Vestimenta</h3>
-                    <p className="font-bold text-gray-700 mb-2">Elegante / Casual</p>
+                    <h3 className="text-4xl mb-2 font-heading">Código de Vestimenta</h3>
+                    <p className="font-bold text-gray-500 mb-2">Elegante / Casual</p>
 
                     <div className="flex justify-center gap-8 mt-6">
                         {/* Damas - Dress */}
                         <div className="flex flex-col items-center gap-2">
-                            <div className="w-14 h-14 bg-pink-50 rounded-full flex items-center justify-center text-primary border border-pink-100 shadow-sm">
-                                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12 2c-1.1 0-2 .9-2 2v2H8l-1 15h10l-1-15h-2V4c0-1.1-.9-2-2-2zm0 5l2 3h-4l2-3z" />
-                                    <path d="M15.5 6H14v-.5a2.5 2.5 0 0 0-5 0V6H8.5L6 21h12l-2.5-15z" />
-                                </svg>
+                            <div className="w-14 h-14 bg-pink-50 rounded-full flex items-center justify-center text-primary border border-pink-100 shadow-sm overflow-hidden">
+                                <img src={vestido} alt="Vestido" className="w-10 h-10 object-contain" />
                             </div>
-                            <span className="font-bold text-gray-800 text-sm">Damas</span>
+                            <span className="font-bold text-gray-500 text-sm">Damas</span>
                         </div>
 
                         {/* Caballeros - Suit */}
                         <div className="flex flex-col items-center gap-2">
                             <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-primary border border-blue-100 shadow-sm">
-                                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M14 2h-4c-1.1 0-2 .9-2 2v2H6l1.5 14h9L18 6h-2V4c0-1.1-.9-2-2-2zm0 5l-2 2-2-2V4h4v3z" />
-                                </svg>
+                                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-primary border border-blue-200 shadow-sm overflow-hidden">
+                                    <img src={camisa} alt="Vestido" className="w-10 h-10 object-contain" />
+                                </div>
                             </div>
-                            <span className="font-bold text-gray-800 text-sm">Caballeros</span>
+                            <span className="font-bold text-gray-500 text-sm">Caballeros</span>
                         </div>
                     </div>
                 </motion.div>
@@ -53,12 +52,12 @@ const PartyInfo = () => {
                     <div className="bg-primary/10 min-w-16 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
                         <MessageCircle size={32} />
                     </div>
-                    <h3 className="text-2xl mb-2 font-heading">Confirmar Asistencia</h3>
+                    <h3 className="text-4xl mb-2 font-heading">Confirmar Asistencia</h3>
                     <p className="text-gray-600 mb-6">
-                        Esperamos contar contigo. Por favor confirma tu asistencia antes del 25 de Enero.
+                        Esperamos contar contigo. Por favor confirma tu asistencia antes del 26 de Enero.
                     </p>
                     <a
-                        href="https://wa.me/1234567890?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda%20de%20Emma%20y%20Simón"
+                        href="https://wa.me/+584249743171?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda%20de%20Emma%20y%20Simón. Soy: "
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-yellow-600 transition-colors font-bold shadow-md hover:shadow-lg"
@@ -77,7 +76,7 @@ const PartyInfo = () => {
                         <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
                             <Gift size={32} />
                         </div>
-                        <h3 className="text-2xl mb-2 font-heading">Mesa de Regalos</h3>
+                        <h3 className="text-4xl mb-2 font-heading">Mesa de Regalos</h3>
                         <p className="text-gray-600 mb-4">
                             Su presencia es nuestro mejor regalo.
                         </p>

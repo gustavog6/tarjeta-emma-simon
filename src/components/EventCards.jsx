@@ -11,23 +11,23 @@ const EventCards = () => {
         {
             type: 'ceremony',
             icon: <Church className="w-12 h-12 text-primary" />,
-            title: 'Ceremonia',
+            title: 'Ceremonia y Recepción',
             place: 'La Llovizna Hotel & Casino',
             address: 'Av. Guayana, Puerto Ordaz, Bolívar',
-            time: '10:00 AM',
+            time: '11:30 AM',
             externalLink: 'https://www.google.com/maps/search/?api=1&query=La+Llovizna+Hotel+%26+Casino+Puerto+Ordaz',
             mapUrl: 'https://www.google.com/maps?q=La+Llovizna+Hotel+%26+Casino+Puerto+Ordaz&output=embed',
         },
-        {
-            type: 'celebration',
-            icon: <GlassWater className="w-12 h-12 text-primary" />,
-            title: 'Recepción',
-            place: "Lagar's Restobar",
-            address: 'C.C. Costa América, Puerto Ordaz',
-            time: '12:00 PM',
-            externalLink: "https://www.google.com/maps/search/?api=1&query=Lagar's+Restobar+Puerto+Ordaz",
-            mapUrl: "https://www.google.com/maps?q=Lagar's+Restobar+Puerto+Ordaz&output=embed",
-        }
+        // {
+        //     type: 'celebration',
+        //     icon: <GlassWater className="w-12 h-12 text-primary" />,
+        //     title: 'Recepción',
+        //     place: "Lagar's Restobar",
+        //     address: 'C.C. Costa América, Puerto Ordaz',
+        //     time: '12:00 PM',
+        //     externalLink: "https://www.google.com/maps/search/?api=1&query=Lagar's+Restobar+Puerto+Ordaz",
+        //     mapUrl: "https://www.google.com/maps?q=Lagar's+Restobar+Puerto+Ordaz&output=embed",
+        // }
     ];
 
     const openMap = (event) => {
@@ -52,17 +52,17 @@ const EventCards = () => {
 
             <div className="max-w-6xl mx-auto relative z-10">
                 <div className="text-center mb-12">
-                    <h2 className="text-4xl md:text-5xl mb-4">Acompáñanos</h2>
+                    <h2 className="font-heading text-5xl md:text-5xl mb-4">Acompáñanos</h2>
                     <p className="text-gray-600 max-w-2xl mx-auto">
                         Será un honor para nosotros contar con tu presencia en este día tan especial.
                     </p>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-8">
+                <div className={`gap-8 ${events.length === 1 ? 'flex justify-center' : 'grid md:grid-cols-2'}`}>
                     {events.map((event, idx) => (
                         <motion.div
                             key={event.type}
-                            className="bg-white p-8 rounded-2xl shadow-lg border border-primary/10 flex flex-col items-center text-center hover:shadow-xl transition-all hover:scale-[1.02] group"
+                            className={`bg-white p-8 rounded-2xl shadow-lg border border-primary/10 flex flex-col items-center text-center hover:shadow-xl transition-all hover:scale-[1.02] group ${events.length === 1 ? 'w-full max-w-xl' : ''}`}
                             initial={{ y: 50, opacity: 0 }}
                             whileInView={{ y: 0, opacity: 1 }}
                             viewport={{ once: true }}
@@ -71,8 +71,8 @@ const EventCards = () => {
                             <div className="mb-6 p-4 bg-secondary/20 rounded-full group-hover:bg-primary/20 transition-colors">
                                 {event.icon}
                             </div>
-                            <h3 className="text-3xl mb-2">{event.title}</h3>
-                            <p className="text-xl font-bold text-gray-800 mb-1">{event.place}</p>
+                            <h3 className="text-4xl mb-2">{event.title}</h3>
+                            <p className="text-xl font-bold text-gray-500 mb-1">{event.place}</p>
                             <p className="text-gray-500 mb-4">{event.time}</p>
 
                             <div className="mt-auto flex gap-4">

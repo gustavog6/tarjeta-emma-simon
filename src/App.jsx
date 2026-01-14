@@ -14,8 +14,8 @@ function App() {
       <Hero />
       <Countdown />
       <EventCards />
-      <ParentsGodparents />
-      <Gallery />
+      {/* <ParentsGodparents /> */}
+      {/* <Gallery /> */}
       <Timeline />
       <PartyInfo />
       <Acknowledgements />
