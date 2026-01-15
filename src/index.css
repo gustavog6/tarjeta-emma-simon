@@ -6,9 +6,9 @@
 
 :root {
   /* Elegant Gold & White Theme (Default) */
-  --color-primary: #7fb5b5; /* Tuequesa  */
-  --color-secondary: #75b3b3; /* Champagne */
-  --color-accent: #75b3b3; /* Pale Gold */
+  --color-primary: #7FB383; /* Tuequesa  */
+  --color-secondary: #658F68; /* Champagne */
+  --color-accent: #658F68; /* Pale Gold */
   --color-background: #FCFCFA; /* Off-white / Cream */
   --color-surface: #FFFFFF; /* Pure White */
 }

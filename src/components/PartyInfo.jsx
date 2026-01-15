@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Gift, UserRound } from 'lucide-react'; // Changed icons
+import { MessageCircle, Gift, UserRound } from 'lucide-react';
 import GiftModal from './GiftModal';
-import vestido from '../assets/vestido.png';
-import camisa from '../assets/camisa.png';
+import MenuModal from './MenuModal';
+import vestido from '../assets/vestido-verde.png';
+import camisa from '../assets/camisa-verde.png';
 
 const PartyInfo = () => {
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
+    const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
 
     return (
         <section className="py-20 px-4 bg-background">
@@ -54,16 +56,14 @@ const PartyInfo = () => {
                     </div>
                     <h3 className="text-4xl mb-2 font-heading">Confirmar Asistencia</h3>
                     <p className="text-gray-600 mb-6">
-                        Esperamos contar contigo. Por favor confirma tu asistencia antes del 26 de Enero.
+                        Esperamos contar contigo. Por favor confirma tu asistencia antes del 26 de enero.
                     </p>
-                    <a
-                        href="https://wa.me/+584249743171?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda%20de%20Emma%20y%20Simón. Soy: "
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <button
+                        onClick={() => setIsMenuModalOpen(true)}
                         className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-secondary transition-colors font-bold shadow-md hover:shadow-lg"
                     >
                         Confirmar por WhatsApp
-                    </a>
+                    </button>
                 </motion.div>
 
                 {/* Gifts */}
@@ -93,6 +93,7 @@ const PartyInfo = () => {
             </div>
 
             <GiftModal isOpen={isGiftModalOpen} onClose={() => setIsGiftModalOpen(false)} />
+            <MenuModal isOpen={isMenuModalOpen} onClose={() => setIsMenuModalOpen(false)} />
 
         </section>
     );
