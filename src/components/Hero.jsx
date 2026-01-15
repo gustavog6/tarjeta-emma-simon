@@ -25,7 +25,7 @@ const Hero = () => {
             <div className="absolute bottom-4 right-4 md:bottom-8 md:right-8 w-16 h-16 border-b-2 border-r-2 border-white/60 z-10 rounded-br-2xl pointer-events-none"></div>
 
             {/* Content */}
-            <div className="relative z-20 text-center text-white p-4 py-28">
+            <div className="relative z-20 text-center text-white p-4 py-28 md:py-52">
 
                 <div className="mt-8 flex justify-center">
                     <motion.img

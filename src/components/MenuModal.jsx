@@ -189,7 +189,7 @@ const MenuModal = ({ isOpen, onClose }) => {
                     exit={{ scale: 0.9, opacity: 0 }}
                 >
                     {/* Header */}
-                    <div className="bg-primary/10 p-6 text-center overflow-hidden sticky top-0 z-10">
+                    <div className="sticky top-0 z-20 bg-background/90 backdrop-blur-md p-6 text-center border-b border-gray-100 shadow-sm">
                         <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
                         <button
                             onClick={handleClose}
@@ -574,7 +574,7 @@ const MenuModal = ({ isOpen, onClose }) => {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: index * 0.1 }}
-                                            className="bg-gradient-to-br from-primary/5 to-secondary/10 p-4 rounded-xl border border-primary/20"
+                                            className="bg-gradient-to-br from-primary/5 to-secondary/10 p-4 rounded-xl border border-primary"
                                         >
                                             <div className="flex items-center gap-2 mb-3">
                                                 <div className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
@@ -628,9 +628,9 @@ const MenuModal = ({ isOpen, onClose }) => {
                         )}
                     </div>
 
-                    <div className="p-4 text-center bg-gray-50 text-xs text-gray-400">
+                    {/* <div className="p-4 text-center bg-white/90 backdrop-blur-md text-xs text-gray-400 sticky bottom-0 z-10 border-t border-gray-100 uppercase tracking-widest">
                         ¡Esperamos verte pronto! 💕
-                    </div>
+                    </div> */}
                 </motion.div>
             </div>
         </AnimatePresence>
