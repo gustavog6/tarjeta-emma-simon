@@ -205,21 +205,23 @@ const MenuModal = ({ isOpen, onClose }) => {
             const urlFormulario = 'https://docs.google.com/forms/d/e/1FAIpQLSeH1dJoByFaPF-9sjGLx6Q7Juuc3NJqIwbeLmXSNULnQaD_og/formResponse';
 
             // Enviar UN REGISTRO POR CADA invitado
-            const promesas = guests.map(async (guest, index) => {
+            const promesas = guests.map((guest, index) => {
                 const contornos = guest.contornos.map(c => c.nombre).join(' y ');
                 const menuPersonal = `Grupo de ${guests.length} persona(s) - Invitado ${index + 1}
     Plato fuerte: ${guest.platoFuerte?.nombre}
     Contornos: ${contornos}`;
 
-                const formData = new FormData();
-                formData.append('entry.1515782771', guest.nombre); // nombre-completo
-                formData.append('entry.43679086', invitadoDe === 'novia' ? 'Emma (Novia)' : 'Simón (Novio)'); // invitado de
-                formData.append('entry.1250341504', menuPersonal); // menu
+                // Usamos URLSearchParams para asegurar que los datos se envíen correctamente
+                const params = new URLSearchParams();
+                params.append('entry.1515782771', guest.nombre); // nombre-completo
+                params.append('entry.43679086', invitadoDe === 'novia' ? 'Emma (Novia)' : 'Simón (Novio)'); // invitado de
+                params.append('entry.1250341504', menuPersonal); // menu
 
                 return fetch(urlFormulario, {
                     method: 'POST',
-                    body: formData,
-                    mode: 'no-cors'
+                    body: params,
+                    mode: 'no-cors',
+                    keepalive: true // Permite que la petición termine aunque se navegue a otra página
                 });
             });
 
