@@ -148,7 +148,27 @@ const MenuModal = ({ isOpen, onClose }) => {
         return `https://wa.me/${numeroWhatsApp}?text=${mensajeCodificado}`;
     };
 
-    const handleConfirm = () => {
+    // const handleConfirm = () => {
+    //     const link = generateWhatsAppLink();
+    //     window.open(link, '_blank');
+    //     handleClose();
+    // };
+
+    // const handleConfirm = async () => {
+    //     // Primero enviar TODOS los invitados a Google Forms
+    //     await enviarConfirmacionGoogleForms(guests, invitadoDe);
+
+    //     // Luego abrir WhatsApp
+    //     const link = generateWhatsAppLink();
+    //     window.open(link, '_blank');
+
+    //     // Cerrar modal
+    //     handleClose();
+    // };
+
+    // Si quieres usar la versión detallada (con info del grupo):
+    const handleConfirmDetallado = async () => {
+        await enviarConfirmacionDetallada(guests, invitadoDe);
         const link = generateWhatsAppLink();
         window.open(link, '_blank');
         handleClose();
@@ -168,6 +188,40 @@ const MenuModal = ({ isOpen, onClose }) => {
     };
 
     if (!isOpen) return null;
+
+    // VERSIÓN ALTERNATIVA: Con información del grupo
+    const enviarConfirmacionDetallada = async (guests, invitadoDe) => {
+        try {
+            const urlFormulario = 'https://docs.google.com/forms/d/e/1FAIpQLSeH1dJoByFaPF-9sjGLx6Q7Juuc3NJqIwbeLmXSNULnQaD_og/formResponse';
+
+            // Enviar UN REGISTRO POR CADA invitado
+            const promesas = guests.map(async (guest, index) => {
+                const contornos = guest.contornos.map(c => c.nombre).join(' y ');
+                const menuPersonal = `Grupo de ${guests.length} persona(s) - Invitado ${index + 1}
+    Plato fuerte: ${guest.platoFuerte?.nombre}
+    Contornos: ${contornos}`;
+
+                const formData = new FormData();
+                formData.append('entry.1515782771', guest.nombre); // nombre-completo
+                formData.append('entry.43679086', invitadoDe === 'novia' ? 'Emma (Novia)' : 'Simón (Novio)'); // invitado de
+                formData.append('entry.1250341504', menuPersonal); // menu
+
+                return fetch(urlFormulario, {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'no-cors'
+                });
+            });
+
+            await Promise.all(promesas);
+
+            console.log(`✅ ${guests.length} confirmación(es) enviada(s) a Google Forms`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error al enviar a Google Forms:', error);
+            return false;
+        }
+    };
 
     return (
         <AnimatePresence>
@@ -301,9 +355,9 @@ const MenuModal = ({ isOpen, onClose }) => {
                                     <h4 className="font-semibold text-gray-500 text-3xl tracking-wider">
                                         ¿Quiénes van a asistir?
                                     </h4>
-                                    <p className="text-sm text-gray-400 mt-2">
+                                    {/* <p className="text-sm text-gray-400 mt-2">
                                         Ingresa el nombre de cada invitado (máximo 5)
-                                    </p>
+                                    </p> */}
                                 </div>
 
                                 {/* Lista de invitados con campo de nombre */}
@@ -617,7 +671,7 @@ const MenuModal = ({ isOpen, onClose }) => {
                                         Editar
                                     </button>
                                     <button
-                                        onClick={handleConfirm}
+                                        onClick={handleConfirmDetallado}
                                         className="flex-1 py-4 rounded-full font-bold flex items-center justify-center gap-2 bg-green-500 text-white hover:bg-green-600 shadow-lg hover:shadow-xl transition-all"
                                     >
                                         <MessageCircle size={20} />
