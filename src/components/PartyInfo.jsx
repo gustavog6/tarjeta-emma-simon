@@ -23,7 +23,7 @@ const PartyInfo = () => {
                         <UserRound size={32} />
                     </div>
                     <h3 className="text-4xl mb-2 font-heading">Código de Vestimenta</h3>
-                    <p className="font-bold text-gray-500 mb-2">Elegante / Casual</p>
+                    <p className="font-base text-gray-500 mb-2">Elegante / Casual</p>
 
                     <div className="flex justify-center gap-8 mt-6">
                         {/* Damas - Dress */}

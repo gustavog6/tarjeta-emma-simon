@@ -5,17 +5,17 @@ import { Church, Utensils, Music, MapPin } from 'lucide-react';
 const Timeline = () => {
     const items = [
         {
-            time: '11:30 AM',
+            time: '11:30 am',
             title: 'Llegada',
             icon: <MapPin className="w-5 h-5 md:w-8 md:h-8 text-primary" />
         },
         {
-            time: '12:00 M',
+            time: '12:00 m',
             title: 'Ceremonia Religiosa',
             icon: <Church className="w-5 h-5 md:w-8 md:h-8 text-primary" />
         },
         {
-            time: '01:00 PM',
+            time: '01:00 pm',
             title: 'Brindis & Almuerzo',
             icon: <Utensils className="w-5 h-5 md:w-8 md:h-8 text-primary" />
         },
@@ -67,8 +67,8 @@ const Timeline = () => {
                             >
                                 {/* Text Content - occupies 50% width on desktop */}
                                 <div className={`w-full md:w-1/2 pl-20 md:pl-0 ${idx % 2 === 0 ? 'md:text-left md:pl-16' : 'md:text-right md:pr-16'} mb-4 md:mb-0 box-border`}>
-                                    <span className="text-3xl font-heading text-primary block mb-1">{item.time}</span>
-                                    <span className="text-xl text-gray-500 font-bold tracking-wide">{item.title}</span>
+                                    <span className="text-4xl font-heading text-primary block mb-1">{item.time}</span>
+                                    <span className="text-xl text-gray-500 font-base tracking-wide">{item.title}</span>
                                 </div>
 
                                 {/* Center Icon */}

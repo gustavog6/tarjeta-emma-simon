@@ -1,5 +1,6 @@
 import React from 'react';
 import Hero from './components/Hero';
+import SaveTheDate from './components/SaveTheDate';
 import Countdown from './components/Countdown';
 import EventCards from './components/EventCards';
 import ParentsGodparents from './components/ParentsGodparents';
@@ -12,6 +13,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background font-body text-gray-800 selection:bg-primary selection:text-white">
       <Hero />
+      <SaveTheDate />
       <Countdown />
       <EventCards />
       {/* <ParentsGodparents /> */}
