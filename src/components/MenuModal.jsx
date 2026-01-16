@@ -167,11 +167,21 @@ const MenuModal = ({ isOpen, onClose }) => {
     // };
 
     // Si quieres usar la versión detallada (con info del grupo):
-    const handleConfirmDetallado = async () => {
-        await enviarConfirmacionDetallada(guests, invitadoDe);
+    // Versión detallada optimizada para móvil (evita bloqueadores de pop-ups)
+    const handleConfirmDetallado = () => {
+        // Enviar a Google Forms en segundo plano
+        enviarConfirmacionDetallada(guests, invitadoDe);
+
+        // Generar y abrir link de WhatsApp
         const link = generateWhatsAppLink();
-        window.open(link, '_blank');
-        handleClose();
+
+        // En móviles, window.location.href es más fiable que window.open
+        window.location.href = link;
+
+        // Pequeño delay para cerrar el modal permitiendo que el sistema procese el link
+        setTimeout(() => {
+            handleClose();
+        }, 1000);
     };
 
     const getTotalSteps = () => 4;
