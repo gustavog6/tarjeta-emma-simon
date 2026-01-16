@@ -7,6 +7,7 @@ import ParentsGodparents from './components/ParentsGodparents';
 import Gallery from './components/Gallery';
 import PartyInfo from './components/PartyInfo';
 import Timeline from './components/Timeline';
+import QuoteSection from './components/QuoteSection';
 import Acknowledgements from './components/Acknowledgements';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
       {/* <Gallery /> */}
       <Timeline />
       <PartyInfo />
+      <QuoteSection />
       <Acknowledgements />
     </div>
   );

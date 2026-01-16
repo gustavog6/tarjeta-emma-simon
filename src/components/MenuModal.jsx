@@ -157,7 +157,7 @@ const MenuModal = ({ isOpen, onClose }) => {
     const getTotalSteps = () => 4;
 
     const getStepLabel = () => {
-        if (step === 1) return 'Paso 1/4: ¿De quién son invitados?';
+        if (step === 1) return 'Paso 1/4: Fui invitado por...';
         if (step === 2) return 'Paso 2/4: ¿Quiénes asisten?';
         if (step === 3) {
             if (menuStep === 'platoFuerte') return `${currentGuest.nombre}: Plato fuerte`;

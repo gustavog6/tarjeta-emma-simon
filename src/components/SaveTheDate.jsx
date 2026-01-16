@@ -37,7 +37,7 @@ const SaveTheDate = () => {
                             <span className="font-heading text-7xl md:text-9xl text-primary leading-none">31</span>
                             <div className="flex flex-col items-start justify-center border-l-2 border-primary/20 pl-4 md:pl-8 h-16 md:h-24">
                                 <span className="font-heading text-3xl md:text-5xl text-primary leading-tight tracking-widest">Enero</span>
-                                <span className="font-body text-xl md:text-2xl text-gray-500 tracking-[0.2em] font-base">2026</span>
+                                <span className="font-body text-xl md:text-2xl text-gray-500 tracking-[0.2em] font-base mx-auto">2026</span>
                             </div>
                         </div>
 

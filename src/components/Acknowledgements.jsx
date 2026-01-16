@@ -11,24 +11,27 @@ const Acknowledgements = () => {
                     <path d="M10 10C30 10 50 30 50 50" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
                 </svg>
             </div>
-            <div className="absolute -bottom-10 -right-10 w-48 h-48 opacity-50 text-[#F5E6CC] pointer-events-none transform -rotate-135">
+            {/* <div className="absolute -bottom-10 -right-10 w-48 h-48 opacity-50 text-[#F5E6CC] pointer-events-none transform -rotate-135">
                 <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
                     <path d="M20 20C20 20 60 20 80 50C100 80 80 120 50 120C20 120 20 80 50 80C80 80 120 120 120 160C120 200 160 200 160 200" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     <path d="M10 10C30 10 50 30 50 50" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
                 </svg>
-            </div>
+            </div> */}
 
             <div className="max-w-2xl mx-auto px-6 relative z-10">
                 <div className="flex justify-center">
                     <img src={silhouetteWhite} alt="Silueta Pareja" className="w-32 h-auto opacity-90" />
                 </div>
                 {/* <h2 className="font-heading text-5xl mb-6">¡Gracias!</h2> */}
-                <p className="text-lg md:text-xl font-light opacity-90 mb-8">
-                    Estamos muy emocionados de compartir este día con ustedes.
-                </p>
-                <p className="text-sm opacity-70">
-                    Con amor, Simón & Emma
-                </p>
+                <div className="mt-12">
+                    <p className="text-lg md:text-xl font-light opacity-80 italic max-w-lg mx-auto leading-relaxed">
+                        "¡Graba mi nombre en tu corazón! ¡Graba mi imagen en tu brazo! ¡Tan fuerte es el amor como la muerte! ¡Tan cierta es la pasión como la tumba! ¡El fuego del amor es una llama que Dios mismo ha encendido!"
+                    </p>
+                    <p className="text-xs tracking-[0.3em] uppercase opacity-60 mt-4">
+                        Cantares 8:6-7 TLA
+                    </p>
+                </div>
+
             </div>
         </footer>
     );
