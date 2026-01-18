@@ -207,7 +207,7 @@ const MenuModal = ({ isOpen, onClose }) => {
             // Enviar UN REGISTRO POR CADA invitado
             const promesas = guests.map((guest, index) => {
                 const contornos = guest.contornos.map(c => c.nombre).join(' y ');
-                const menuPersonal = `Grupo de ${guests.length} persona(s) - Invitado ${index + 1}
+                const menuPersonal = `Grupo de ${guests.length} persona(s) perteneciente a: ${guests[0].nombre} - Invitado ${index + 1}
     Plato fuerte: ${guest.platoFuerte?.nombre}
     Contornos: ${contornos}`;
 
