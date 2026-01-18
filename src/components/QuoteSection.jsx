@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Quote } from 'lucide-react';
+import ManoElegante from '../assets/emmasimonmanoelegante.png';
 
 const QuoteSection = () => {
     return (
@@ -13,12 +13,16 @@ const QuoteSection = () => {
             <div className="max-w-3xl mx-auto text-center relative z-10">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
-                    whileInView={{ opacity: 0.6, scale: 1 }}
+                    whileInView={{ opacity: 0.8, scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ duration: 1 }}
-                    className="text-primary/20 mb-8 flex justify-center"
+                    className="mb-8 flex justify-center"
                 >
-                    <Quote size={60} fill="currentColor" />
+                    <img
+                        src={ManoElegante}
+                        alt="Decoración"
+                        className="w-48 h-48 object-contain"
+                    />
                 </motion.div>
 
                 <motion.div

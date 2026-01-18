@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Church, Utensils, Music, MapPin } from 'lucide-react';
+import { Church, Utensils, Music, MapPin, Wine } from 'lucide-react';
 
 const Timeline = () => {
     const items = [
@@ -15,8 +15,13 @@ const Timeline = () => {
             icon: <Church className="w-5 h-5 md:w-8 md:h-8 text-primary" />
         },
         {
-            time: '01:00 pm',
-            title: 'Brindis & Almuerzo',
+            time: '12:45 m',
+            title: 'Brindis & Sesión de Fotos',
+            icon: <Wine className="w-5 h-5 md:w-8 md:h-8 text-primary" />
+        },
+        {
+            time: '01:45 pm',
+            title: 'Almuerzo & Celebración',
             icon: <Utensils className="w-5 h-5 md:w-8 md:h-8 text-primary" />
         },
         // {
