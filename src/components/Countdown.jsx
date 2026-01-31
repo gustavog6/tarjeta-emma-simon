@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 const Countdown = () => {
     // Target date: July 29, 2026 14:00:00
-    const targetDate = new Date('2026-01-31T10:00:00').getTime();
+    const targetDate = new Date('2026-01-31T11:30:00').getTime();
 
     const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
 
