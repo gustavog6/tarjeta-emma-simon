@@ -438,7 +438,7 @@ const AdminPanel = ({ user, onLogout }) => {
     const totalAsistentesConfirmados = confirmadosAgrupados.reduce((acc, g) => acc + g.asistentes.length, 0);
 
     return (
-        <div className="min-h-screen bg-gray-50 p-3 md:p-6 font-body text-gray-800">
+        <div className="admin-panel min-h-screen bg-gray-50 p-3 md:p-6 font-body text-gray-800">
             <div className="max-w-7xl mx-auto">
 
                 {/* Header Superior */}
@@ -620,27 +620,47 @@ const AdminPanel = ({ user, onLogout }) => {
                                             </tr>
                                         ) : (
                                             confirmadosAgrupados.map(({ titular, asistentes, fotosCount }) => {
-                                                const isExpanded = Boolean(expandedRows[titular.id]);
-                                                const hasAsistentes = asistentes.length > 0;
-                                                const hasTitularRow = asistentes.some((a) => a.es_titular);
                                                 const slotsCount = Number(titular.slots_totales ?? titular.slots ?? 0);
                                                 const totalPases = 1 + slotsCount;
+                                                const hasAsistentes = asistentes.length > 0;
+                                                const hasTitularRow = asistentes.some((a) => a.es_titular);
                                                 const cupoLleno = asistentes.length >= totalPases;
+                                                // Si slots_totales === 0 y solo es 1 persona, NO necesita nested table
+                                                const usaNested = slotsCount > 0 || asistentes.length > 1;
+                                                const isExpanded = usaNested && Boolean(expandedRows[titular.id]);
+                                                const unicoAsistente = !usaNested ? asistentes[0] : null;
 
                                                 return (
                                                     <React.Fragment key={titular.id}>
                                                         <tr className={`hover:bg-gray-50/80 transition-colors ${isExpanded ? 'bg-gray-50/40' : ''}`}>
                                                             <td className="px-3 py-2 text-center align-middle">
-                                                                <button
-                                                                    onClick={() => toggleRow(titular.id)}
-                                                                    className="w-5 h-5 inline-flex items-center justify-center rounded border border-gray-300 text-gray-500 hover:border-primary hover:text-primary transition-colors cursor-pointer bg-white"
-                                                                >
-                                                                    {isExpanded ? <Minus size={11} /> : <Plus size={11} />}
-                                                                </button>
+                                                                {usaNested ? (
+                                                                    <button
+                                                                        onClick={() => toggleRow(titular.id)}
+                                                                        className="w-5 h-5 inline-flex items-center justify-center rounded border border-gray-300 text-gray-500 hover:border-primary hover:text-primary transition-colors cursor-pointer bg-white"
+                                                                        title={isExpanded ? 'Colapsar acompañantes' : 'Ver acompañantes'}
+                                                                    >
+                                                                        {isExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-gray-300 text-xs" title="Invitado individual (sin acompañantes)">•</span>
+                                                                )}
                                                             </td>
 
-                                                            <td className="px-3 py-2 font-semibold text-gray-900 whitespace-nowrap align-middle">
-                                                                {titular.nombre} {titular.apellido}
+                                                            <td className="px-3 py-2 align-middle">
+                                                                <div className="font-semibold text-gray-900 whitespace-nowrap">
+                                                                    {titular.nombre} {titular.apellido}
+                                                                </div>
+                                                                {unicoAsistente && (
+                                                                    <div className="text-[10px] text-gray-500 mt-0.5">
+                                                                        <span className="font-medium text-gray-700">
+                                                                            {labelOf(platosList, unicoAsistente.plato_fuerte)}
+                                                                        </span>
+                                                                        {(unicoAsistente.contornos || []).length > 0 && (
+                                                                            <> · {(unicoAsistente.contornos || []).map((id) => labelOf(contornosList, id)).join(', ')}</>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </td>
 
                                                             <td className="px-3 py-2 align-middle">
@@ -699,24 +719,35 @@ const AdminPanel = ({ user, onLogout }) => {
                                                             </td>
 
                                                             <td className="px-3 py-2 text-right whitespace-nowrap align-middle">
-                                                                {titular.confirmed_at || hasAsistentes ? (
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            setDeleteItem({
-                                                                                type: 'reset_confirmacion',
-                                                                                id: titular.id,
-                                                                                name: `${titular.nombre} ${titular.apellido}`,
-                                                                            })
-                                                                        }
-                                                                        className="inline-flex items-center gap-1 px-2 py-1 text-gray-500 hover:text-amber-700 hover:bg-amber-50 rounded transition-colors cursor-pointer text-[10px] font-semibold border border-gray-200"
-                                                                        title="Reiniciar confirmación sin borrar al invitado"
-                                                                    >
-                                                                        <RotateCcw size={12} />
-                                                                        Reiniciar
-                                                                    </button>
-                                                                ) : (
-                                                                    <span className="text-gray-300 text-[10px] italic">Sin confirmar</span>
-                                                                )}
+                                                                <div className="inline-flex items-center gap-1.5 justify-end">
+                                                                    {unicoAsistente && (
+                                                                        <button
+                                                                            onClick={() => openEditAsistente(titular, unicoAsistente)}
+                                                                            className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                                                            title="Editar menú del asistente"
+                                                                        >
+                                                                            <Edit2 size={13} />
+                                                                        </button>
+                                                                    )}
+                                                                    {titular.confirmed_at || hasAsistentes ? (
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                setDeleteItem({
+                                                                                    type: 'reset_confirmacion',
+                                                                                    id: titular.id,
+                                                                                    name: `${titular.nombre} ${titular.apellido}`,
+                                                                                })
+                                                                            }
+                                                                            className="inline-flex items-center gap-1 px-2 py-1 text-gray-500 hover:text-amber-700 hover:bg-amber-50 rounded transition-colors cursor-pointer text-[10px] font-semibold border border-gray-200"
+                                                                            title="Reiniciar confirmación sin borrar al invitado"
+                                                                        >
+                                                                            <RotateCcw size={12} />
+                                                                            Reiniciar
+                                                                        </button>
+                                                                    ) : (
+                                                                        <span className="text-gray-300 text-[10px] italic">Sin confirmar</span>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                         </tr>
 

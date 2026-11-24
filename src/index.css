@@ -26,6 +26,16 @@ h1, h2, h3, h4, h5, h6 {
   @apply font-heading text-primary;
 }
 
+/* Panel administrativo: siempre fuente legible (Lato), sin cursiva */
+.admin-panel h1,
+.admin-panel h2,
+.admin-panel h3,
+.admin-panel h4,
+.admin-panel h5,
+.admin-panel h6 {
+  @apply font-body;
+}
+
 .glass-panel {
   @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl;
 }

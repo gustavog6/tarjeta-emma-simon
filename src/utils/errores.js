@@ -1,5 +1,6 @@
 const MENSAJES = {
     cupo_excedido: 'El cupo de este invitado está lleno (titular + acompañantes permitidos).',
+    cupo_agotado: 'Ya utilizaste todos los pases disponibles de tu invitación.',
     slots_menor_que_confirmados:
         'No puedes bajar los acompañantes permitidos por debajo de las personas ya confirmadas. Primero elimina asistentes.',
     ya_confirmado: 'Esta invitación ya fue confirmada.',

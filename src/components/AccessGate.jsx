@@ -19,7 +19,7 @@ import { useConfig } from '../context/ConfigContext';
  */
 export default function AccessGate({ children }) {
     const { config } = useConfig();
-    const { invitado, loading, error } = useInvitado();
+    const { invitado, confirmaciones, loading, error, reload } = useInvitado();
 
     // ── Cargando ──────────────────────────────
     if (loading) {
@@ -65,5 +65,5 @@ export default function AccessGate({ children }) {
     }
 
     // ── Token válido → renderiza la invitación ─
-    return <>{children(invitado)}</>;
+    return <>{children(invitado, confirmaciones, reload)}</>;
 }

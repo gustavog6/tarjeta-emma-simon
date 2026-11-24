@@ -46,7 +46,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-body text-gray-800">
+        <div className="admin-panel min-h-screen bg-gray-50 flex items-center justify-center p-4 font-body text-gray-800">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 max-w-sm w-full p-7">
                 <div className="text-center mb-6">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">

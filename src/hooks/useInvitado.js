@@ -1,23 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 /**
  * useInvitado
  * ───────────────────────────────────────────────
- * Lee el parámetro ?ref= de la URL y consulta el
- * invitado mediante la RPC segura `obtener_invitado`.
+ * Lee el parámetro ?ref= de la URL, obtiene el invitado y
+ * las confirmaciones ya registradas mediante RPCs seguras.
  */
 export function useInvitado() {
-    const [invitado, setInvitado] = useState(undefined);
-    const [loading, setLoading]   = useState(true);
-    const [error, setError]       = useState(null);
+    const [invitado, setInvitado]             = useState(undefined);
+    const [confirmaciones, setConfirmaciones] = useState([]);
+    const [loading, setLoading]               = useState(true);
+    const [error, setError]                   = useState(null);
 
-    useEffect(() => {
+    const fetchInvitado = useCallback(async () => {
         const params = new URLSearchParams(window.location.search);
         const token  = params.get('ref');
 
         if (!token) {
             setInvitado(null);
+            setConfirmaciones([]);
             setLoading(false);
             return;
         }
@@ -25,44 +27,61 @@ export function useInvitado() {
         const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!UUID_REGEX.test(token)) {
             setInvitado(null);
+            setConfirmaciones([]);
             setLoading(false);
             return;
         }
 
-        async function fetchInvitado() {
-            try {
-                const { data, error: rpcError } = await supabase.rpc('obtener_invitado', {
-                    p_token: token,
-                });
+        try {
+            let row = null;
+            const { data, error: rpcError } = await supabase.rpc('obtener_invitado', {
+                p_token: token,
+            });
 
-                if (rpcError) {
-                    // Fallback temporal solo si aún no se ha ejecutado 004_integridad.sql
-                    if (rpcError.code === 'PGRST202' || rpcError.code === '42883') {
-                        const { data: fbData, error: fbError } = await supabase
-                            .from('invitados')
-                            .select('*')
-                            .eq('token', token)
-                            .maybeSingle();
-                        if (fbError) throw fbError;
-                        setInvitado(fbData ?? null);
-                        return;
-                    }
+            if (rpcError) {
+                if (rpcError.code === 'PGRST202' || rpcError.code === '42883') {
+                    const { data: fbData, error: fbError } = await supabase
+                        .from('invitados')
+                        .select('*')
+                        .eq('token', token)
+                        .maybeSingle();
+                    if (fbError) throw fbError;
+                    row = fbData ?? null;
+                } else {
                     throw rpcError;
                 }
-
-                const row = Array.isArray(data) ? data[0] : data;
-                setInvitado(row ?? null);
-            } catch (err) {
-                console.error('[useInvitado]', err);
-                setError(err.message ?? 'Error al cargar la invitación');
-                setInvitado(null);
-            } finally {
-                setLoading(false);
+            } else {
+                row = Array.isArray(data) ? data[0] ?? null : data ?? null;
             }
-        }
 
-        fetchInvitado();
+            setInvitado(row);
+
+            if (row) {
+                const { data: confData, error: confErr } = await supabase.rpc(
+                    'obtener_confirmaciones_invitado',
+                    { p_token: token }
+                );
+                if (!confErr && Array.isArray(confData)) {
+                    setConfirmaciones(confData);
+                } else {
+                    setConfirmaciones([]);
+                }
+            } else {
+                setConfirmaciones([]);
+            }
+        } catch (err) {
+            console.error('[useInvitado]', err);
+            setError(err.message ?? 'Error al cargar la invitación');
+            setInvitado(null);
+            setConfirmaciones([]);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
-    return { invitado, loading, error };
+    useEffect(() => {
+        fetchInvitado();
+    }, [fetchInvitado]);
+
+    return { invitado, confirmaciones, loading, error, reload: fetchInvitado };
 }

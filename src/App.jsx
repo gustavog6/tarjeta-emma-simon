@@ -15,8 +15,7 @@ import AdminPanel from './components/AdminPanel';
 import AdminLogin from './components/AdminLogin';
 import { supabase } from './lib/supabase';
 
-function InvitacionContent({ initialInvitado }) {
-    const [invitado, setInvitado] = useState(initialInvitado);
+function InvitacionContent({ invitado, confirmaciones, onReload }) {
     const [entered, setEntered] = useState(false);
     const [autoPlayMusic, setAutoPlayMusic] = useState(true);
 
@@ -40,7 +39,8 @@ function InvitacionContent({ initialInvitado }) {
             <Timeline />
             <RsvpSection
                 invitado={invitado}
-                onUpdateInvitado={setInvitado}
+                confirmaciones={confirmaciones}
+                onReload={onReload}
             />
             <ParentsSection />
             <Gallery invitado={invitado} />
@@ -106,7 +106,13 @@ function App() {
 
     return (
         <AccessGate>
-            {(invitado) => <InvitacionContent initialInvitado={invitado} />}
+            {(invitado, confirmaciones, reload) => (
+                <InvitacionContent
+                    invitado={invitado}
+                    confirmaciones={confirmaciones}
+                    onReload={reload}
+                />
+            )}
         </AccessGate>
     );
 }

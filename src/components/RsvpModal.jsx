@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, UtensilsCrossed, Check, ChevronRight, ChevronLeft,
-    MessageCircle, Users, Plus, Trash2, Heart, AlertCircle
+    MessageCircle, Users, Plus, Trash2, Heart, AlertCircle, UserPlus
 } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import { supabase } from '../lib/supabase';
@@ -23,52 +23,64 @@ const createEmptyGuest = (nombre = '', apellido = '', esTitular = false) => ({
 
 const fullNameOf = (g) => `${g.nombre || ''} ${g.apellido || ''}`.trim();
 
-const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
+const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onConfirmed }) => {
     const { config } = useConfig();
     const { novios, menu, fecha, textos, grupos = [] } = config;
-    const rawSlots = invitado?.slots_totales ?? invitado?.slots ?? 0;
-    const maxSlots = 1 + (Number(rawSlots) || 0);
-    const defaultGrupo = invitado?.grupo || null;
+    const rawSlots = Number(invitado?.slots_totales ?? invitado?.slots ?? 0);
+    const maxSlots = 1 + rawSlots;
+    const yaConfirmados = confirmacionesPrevias.length;
+    const yaTieneTitular = confirmacionesPrevias.some((c) => c.es_titular);
+    const cuposRestantes = Math.max(0, maxSlots - yaConfirmados);
+    const defaultGrupo = invitado?.grupo || grupos[0]?.id || null;
 
-    const initialTitular = () =>
-        createEmptyGuest(invitado?.nombre || '', invitado?.apellido || '', true);
+    const buildInitialGuests = () =>
+        yaTieneTitular
+            ? [createEmptyGuest('', '', false)]
+            : [createEmptyGuest(invitado?.nombre || '', invitado?.apellido || '', true)];
 
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(yaTieneTitular ? 2 : 1); // 1 | 2 | 2.5 (aviso cupos) | 3 | 4
     const [invitadoDe, setInvitadoDe] = useState(defaultGrupo);
-    const [guests, setGuests] = useState([initialTitular()]);
+    const [guests, setGuests] = useState(buildInitialGuests);
     const [currentGuestIndex, setCurrentGuestIndex] = useState(0);
     const [menuStep, setMenuStep] = useState('platoFuerte');
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState(null);
 
+    // Sincronizar estado cada vez que se abre el modal
+    useEffect(() => {
+        if (isOpen) {
+            setStep(yaTieneTitular ? 2 : 1);
+            setGuests(buildInitialGuests());
+            setCurrentGuestIndex(0);
+            setMenuStep('platoFuerte');
+            setInvitadoDe(defaultGrupo);
+            setSubmitting(false);
+            setSubmitError(null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, yaTieneTitular, yaConfirmados]);
+
     if (!isOpen) return null;
 
-    const currentGuest = guests[currentGuestIndex];
+    const currentGuest = guests[currentGuestIndex] || guests[0];
     const maxContornos = menu?.maxContornos ?? 2;
 
-    const resetSelections = () => {
-        setStep(1);
-        setGuests([initialTitular()]);
-        setCurrentGuestIndex(0);
-        setMenuStep('platoFuerte');
-        setInvitadoDe(defaultGrupo);
+    const handleClose = () => {
         setSubmitting(false);
         setSubmitError(null);
-    };
-
-    const handleClose = () => {
-        resetSelections();
         onClose();
     };
 
     const addGuest = () => {
-        if (guests.length < maxSlots) {
+        if (guests.length < cuposRestantes) {
             setGuests([...guests, createEmptyGuest()]);
         }
     };
 
     const removeGuest = (index) => {
-        if (guests.length > 1 && index > 0) {
+        // Si es primera vez (titular en índice 0), no permitir borrar índice 0
+        if (!yaTieneTitular && index === 0) return;
+        if (guests.length > 1) {
             const newGuests = guests.filter((_, i) => i !== index);
             setGuests(newGuests);
             if (currentGuestIndex >= newGuests.length) {
@@ -101,6 +113,17 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
     const allGuestsHaveNames = () =>
         guests.every((g) => g.nombre.trim().length > 0 && g.apellido.trim().length > 0);
 
+    const handleContinueFromStep2 = () => {
+        // Si todavía tiene pases sin usar, mostrar el paso de aviso antes de pasar al menú
+        if (guests.length < cuposRestantes) {
+            setStep(2.5);
+        } else {
+            setStep(3);
+            setCurrentGuestIndex(0);
+            setMenuStep('platoFuerte');
+        }
+    };
+
     const goToNextGuest = () => {
         if (currentGuestIndex < guests.length - 1) {
             setCurrentGuestIndex(currentGuestIndex + 1);
@@ -131,21 +154,21 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
             novio.whatsapp ||
             '';
 
-        let mensaje = `¡Hola! Confirmo asistencia a la boda de ${novio.nombre} & ${novia.nombre} 💍\n\n`;
+        let mensaje = yaTieneTitular
+            ? `¡Hola! Agrego acompañante(s) a mi confirmación para la boda de ${novio.nombre} & ${novia.nombre} 💍\n\n`
+            : `¡Hola! Confirmo asistencia a la boda de ${novio.nombre} & ${novia.nombre} 💍\n\n`;
         mensaje += `*Grupo:* ${grupoLabel(grupos, invitadoDe)}\n`;
-        mensaje += `*Total de personas:* ${guests.length}\n\n`;
+        mensaje += `*Titular:* ${invitado?.nombre || ''} ${invitado?.apellido || ''}\n`;
+        mensaje += `*Personas en este envío:* ${guests.length} (${yaConfirmados + guests.length}/${maxSlots} total)\n\n`;
 
         guests.forEach((guest, index) => {
             const contornos = guest.contornos.map((c) => c.nombre).join(' y ');
-            mensaje += `*Invitado ${index + 1}:* ${fullNameOf(guest)}\n`;
+            mensaje += `*${guest.esTitular ? 'Titular' : `Acompañante ${yaTieneTitular ? yaConfirmados + index : index}`}:* ${fullNameOf(guest)}\n`;
             if (guest.platoFuerte) {
                 mensaje += `• Plato fuerte: ${guest.platoFuerte.nombre}\n`;
             }
             if (contornos) {
                 mensaje += `• Contornos: ${contornos}\n`;
-            }
-            if (guest.regalo) {
-                mensaje += `• Regalo: ${guest.regalo}\n`;
             }
             mensaje += `\n`;
         });
@@ -189,10 +212,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
             if (error) throw error;
 
             if (onConfirmed) {
-                onConfirmed(data || { ...invitado, confirmed_at: new Date().toISOString() });
+                await onConfirmed(data || { ...invitado, confirmed_at: new Date().toISOString() });
             }
 
-            // Solo abrimos WhatsApp si la confirmación se guardó con éxito en BD
             const link = generateWhatsAppLink();
             window.location.href = link;
 
@@ -209,14 +231,22 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
 
     const getStepLabel = () => {
         if (step === 1) return 'Paso 1/4: ¿De parte de quién vienes?';
-        if (step === 2) return `Paso 2/4: ¿Quiénes asisten? (Máx ${maxSlots})`;
+        if (step === 2) {
+            return yaTieneTitular
+                ? `Agregar acompañantes (${cuposRestantes} ${cuposRestantes === 1 ? 'pase disponible' : 'pases disponibles'})`
+                : `Paso 2/4: ¿Quiénes asisten? (Máx ${maxSlots})`;
+        }
+        if (step === 2.5) return 'Tienes pases disponibles en tu invitación';
         if (step === 3) {
             if (menuStep === 'platoFuerte') return `${fullNameOf(currentGuest)}: Plato fuerte`;
             if (menuStep === 'contornos') return `${fullNameOf(currentGuest)}: Contornos`;
         }
-        if (step === 4) return 'Paso 4/4: Confirmar asistencia';
+        if (step === 4) return 'Confirmar asistencia';
         return '';
     };
+
+    const progressStep = step === 2.5 ? 2 : step;
+    const pasesSinUsarAhora = cuposRestantes - guests.length;
 
     return (
         <AnimatePresence>
@@ -248,7 +278,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                         <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm text-primary">
                             <UtensilsCrossed size={32} />
                         </div>
-                        <h3 className="font-heading text-4xl text-primary">{textos?.rsvp?.titulo || 'Confirmar Asistencia'}</h3>
+                        <h3 className="font-heading text-4xl text-primary">
+                            {yaTieneTitular ? 'Agregar Acompañantes' : (textos?.rsvp?.titulo || 'Confirmar Asistencia')}
+                        </h3>
                         <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">
                             {getStepLabel()}
                         </p>
@@ -258,7 +290,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                 <div
                                     key={s}
                                     className={`h-2 rounded-full transition-all duration-300 ${
-                                        s <= step ? 'bg-primary w-8' : 'bg-gray-300 w-4'
+                                        s <= progressStep ? 'bg-primary w-8' : 'bg-gray-300 w-4'
                                     }`}
                                 />
                             ))}
@@ -266,7 +298,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                     </div>
 
                     <div className="p-6">
-                        {/* Step 1: Novia / Novio */}
+                        {/* Step 1: Grupo */}
                         {step === 1 && (
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
@@ -330,7 +362,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                             </motion.div>
                         )}
 
-                        {/* Step 2: Nombres y Apellidos de invitados */}
+                        {/* Step 2: Nombres y Apellidos */}
                         {step === 2 && (
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
@@ -341,71 +373,81 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                 <div className="text-center mb-4">
                                     <Users size={40} className="mx-auto text-primary mb-2" />
                                     <h4 className="font-semibold text-gray-700 text-2xl tracking-wide">
-                                        ¿Quiénes van a asistir?
+                                        {yaTieneTitular ? '¿Qué acompañantes agregarás?' : '¿Quiénes van a asistir?'}
                                     </h4>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Tu invitación es válida para hasta <strong>{maxSlots} persona{maxSlots > 1 ? 's' : ''}</strong> (Tú + {rawSlots} acompañante{Number(rawSlots) === 1 ? '' : 's'}).
-                                    </p>
+                                    {yaTieneTitular ? (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Ya registraste <strong>{yaConfirmados} de {maxSlots}</strong> pases. Puedes añadir hasta{' '}
+                                            <strong>{cuposRestantes} acompañante{cuposRestantes === 1 ? '' : 's'}</strong> más.
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Tu invitación es válida para hasta <strong>{maxSlots} persona{maxSlots > 1 ? 's' : ''}</strong> (Tú + {rawSlots} acompañante{rawSlots === 1 ? '' : 's'}).
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-3">
-                                    {guests.map((guest, index) => (
-                                        <motion.div
-                                            key={index}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2"
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center text-primary flex-shrink-0 font-bold text-xs">
-                                                        {index + 1}
+                                    {guests.map((guest, index) => {
+                                        const isLockedTitular = guest.esTitular && index === 0;
+                                        return (
+                                            <motion.div
+                                                key={index}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center text-primary flex-shrink-0 font-bold text-xs">
+                                                            {yaTieneTitular ? yaConfirmados + index + 1 : index + 1}
+                                                        </div>
+                                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                                            {guest.esTitular ? 'Titular' : `Acompañante ${yaTieneTitular ? yaConfirmados + index : index}`}
+                                                        </span>
                                                     </div>
-                                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                                        {index === 0 ? 'Titular' : `Acompañante ${index}`}
-                                                    </span>
+                                                    {guests.length > 1 && !isLockedTitular && (
+                                                        <button
+                                                            onClick={() => removeGuest(index)}
+                                                            className="p-1.5 text-red-400 hover:text-red-600 rounded-full transition-colors cursor-pointer"
+                                                            title="Quitar acompañante"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                {guests.length > 1 && index > 0 && (
-                                                    <button
-                                                        onClick={() => removeGuest(index)}
-                                                        className="p-1.5 text-red-400 hover:text-red-600 rounded-full transition-colors cursor-pointer"
-                                                        title="Quitar acompañante"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={guest.nombre}
-                                                    onChange={(e) => updateGuestField(index, 'nombre', e.target.value)}
-                                                    readOnly={index === 0 && Boolean(invitado?.nombre)}
-                                                    placeholder="Nombre *"
-                                                    className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
-                                                        index === 0 && invitado?.nombre
-                                                            ? 'bg-gray-100 border-gray-200 text-gray-600'
-                                                            : 'bg-white border-gray-300 text-gray-700'
-                                                    }`}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={guest.apellido}
-                                                    onChange={(e) => updateGuestField(index, 'apellido', e.target.value)}
-                                                    readOnly={index === 0 && Boolean(invitado?.apellido)}
-                                                    placeholder="Apellido *"
-                                                    className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
-                                                        index === 0 && invitado?.apellido
-                                                            ? 'bg-gray-100 border-gray-200 text-gray-600'
-                                                            : 'bg-white border-gray-300 text-gray-700'
-                                                    }`}
-                                                />
-                                            </div>
-                                        </motion.div>
-                                    ))}
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={guest.nombre}
+                                                        onChange={(e) => updateGuestField(index, 'nombre', e.target.value)}
+                                                        readOnly={isLockedTitular && Boolean(invitado?.nombre)}
+                                                        placeholder="Nombre *"
+                                                        className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
+                                                            isLockedTitular && invitado?.nombre
+                                                                ? 'bg-gray-100 border-gray-200 text-gray-600'
+                                                                : 'bg-white border-gray-300 text-gray-700'
+                                                        }`}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={guest.apellido}
+                                                        onChange={(e) => updateGuestField(index, 'apellido', e.target.value)}
+                                                        readOnly={isLockedTitular && Boolean(invitado?.apellido)}
+                                                        placeholder="Apellido *"
+                                                        className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
+                                                            isLockedTitular && invitado?.apellido
+                                                                ? 'bg-gray-100 border-gray-200 text-gray-600'
+                                                                : 'bg-white border-gray-300 text-gray-700'
+                                                        }`}
+                                                    />
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
                                 </div>
 
-                                {guests.length < maxSlots && (
+                                {guests.length < cuposRestantes && (
                                     <motion.button
                                         onClick={addGuest}
                                         className="w-full p-3 rounded-xl border-2 border-dashed border-primary/30 text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm font-semibold"
@@ -413,24 +455,22 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                         whileTap={{ scale: 0.98 }}
                                     >
                                         <Plus size={18} />
-                                        Agregar acompañante ({guests.length}/{maxSlots})
+                                        Agregar acompañante ({yaConfirmados + guests.length}/{maxSlots})
                                     </motion.button>
                                 )}
 
                                 <div className="flex gap-3 mt-6">
+                                    {!yaTieneTitular && (
+                                        <button
+                                            onClick={() => setStep(1)}
+                                            className="flex-1 py-3.5 rounded-full font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                        >
+                                            <ChevronLeft size={18} />
+                                            Atrás
+                                        </button>
+                                    )}
                                     <button
-                                        onClick={() => setStep(1)}
-                                        className="flex-1 py-3.5 rounded-full font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                                    >
-                                        <ChevronLeft size={18} />
-                                        Atrás
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setStep(3);
-                                            setCurrentGuestIndex(0);
-                                            setMenuStep('platoFuerte');
-                                        }}
+                                        onClick={handleContinueFromStep2}
                                         disabled={!allGuestsHaveNames()}
                                         className={`flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                                             allGuestsHaveNames()
@@ -440,6 +480,65 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                     >
                                         Continuar
                                         <ChevronRight size={18} />
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* Step 2.5: Aviso elegante de pases disponibles sin usar */}
+                        {step === 2.5 && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.96 }}
+                                className="space-y-5 text-center py-2"
+                            >
+                                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+                                    <UserPlus size={30} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="font-heading text-4xl text-primary">
+                                        ¡Tienes pases disponibles!
+                                    </h4>
+                                    <p className="text-sm text-gray-600 leading-relaxed max-w-sm mx-auto">
+                                        Tu invitación incluye <strong>{maxSlots} persona{maxSlots > 1 ? 's' : ''}</strong> en total
+                                        {yaConfirmados > 0 && ` (ya confirmaste ${yaConfirmados})`}.
+                                        {guests.length === 1 && !yaTieneTitular ? (
+                                            <> Estás a punto de confirmar solo por ti, quedando <strong>{pasesSinUsarAhora} acompañante{pasesSinUsarAhora === 1 ? '' : 's'}</strong> sin registrar.</>
+                                        ) : (
+                                            <> Aún te {pasesSinUsarAhora === 1 ? 'queda' : 'quedan'} <strong>{pasesSinUsarAhora} pase{pasesSinUsarAhora === 1 ? '' : 's'}</strong> sin usar.</>
+                                        )}
+                                    </p>
+                                </div>
+
+                                <div className="bg-primary/5 border border-primary/20 rounded-xl p-3.5 text-xs text-gray-600 leading-relaxed">
+                                    ¿Deseas añadir a tus acompañantes ahora? Si prefieres continuar así, podrás volver a abrir tu invitación más adelante para registrar los pases restantes.
+                                </div>
+
+                                <div className="flex flex-col gap-2.5 pt-2">
+                                    <button
+                                        onClick={() => {
+                                            if (guests.length < cuposRestantes) {
+                                                setGuests([...guests, createEmptyGuest()]);
+                                            }
+                                            setStep(2);
+                                        }}
+                                        className="w-full py-3.5 rounded-full font-bold bg-primary text-white hover:bg-secondary shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                                    >
+                                        <Plus size={18} />
+                                        Sí, agregar acompañantes
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setStep(3);
+                                            setCurrentGuestIndex(0);
+                                            setMenuStep('platoFuerte');
+                                        }}
+                                        className="w-full py-3 rounded-full font-semibold border border-primary/30 text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                                    >
+                                        Continuar de todos modos
+                                        <ChevronRight size={16} />
                                     </button>
                                 </div>
                             </motion.div>
@@ -630,6 +729,12 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                         </div>
                                     ))}
                                 </div>
+
+                                {pasesSinUsarAhora > 0 && (
+                                    <p className="text-[11px] text-center text-gray-500">
+                                        Te quedarán <strong>{pasesSinUsarAhora} {pasesSinUsarAhora === 1 ? 'pase disponible' : 'pases disponibles'}</strong> por si deseas agregar acompañantes luego.
+                                    </p>
+                                )}
 
                                 <div className="flex gap-3 mt-6">
                                     <button

@@ -16,6 +16,7 @@ Ve a **SQL Editor** en el dashboard de Supabase y ejecuta **en orden estricto**:
 3. `supabase/003_configuracion.sql` (renombra `slots` → `slots_totales` y crea la tabla `configuracion`)
 4. `supabase/004_integridad.sql` (triggers de integridad, funciones RPC seguras y RLS restrictiva)
 5. `supabase/005_grupos_dinamicos.sql` (grupos de invitados 100% dinámicos en `configuracion`)
+6. `supabase/006_confirmacion_parcial.sql` (confirmaciones parciales hasta agotar pases)
 
 ## 3. Crear usuario administrador (los novios) y cerrar el registro público
 
