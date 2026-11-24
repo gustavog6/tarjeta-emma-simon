@@ -576,7 +576,7 @@ const AdminPanel = ({ user, onLogout }) => {
                                     Colapsar
                                 </button>
                                 <button
-                                    onClick={() => exportConfirmacionesToXLSX(confirmadosAgrupados, config)}
+                                    onClick={() => exportConfirmacionesToXLSX(confirmadosAgrupados, config, grupoFilter)}
                                     disabled={confirmadosAgrupados.length === 0}
                                     className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white rounded text-xs font-bold transition-colors cursor-pointer"
                                 >
