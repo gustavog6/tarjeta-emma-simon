@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Church, GlassWater, MapPin, Video, Music } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import MapModal from './MapModal';
 
 // Mapa de tipo → icono de Lucide
@@ -16,7 +16,8 @@ const EventCards = () => {
     const [modalOpen,  setModalOpen]  = useState(false);
     const [currentMap, setCurrentMap] = useState({ url: '', title: '', external: '' });
 
-    const { venues, textos } = evento;
+    const { config } = useConfig();
+    const { venues, textos } = config;
     const { titulo, subtitulo } = textos.eventCards;
 
     const openMap = (venue) => {

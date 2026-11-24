@@ -4,18 +4,11 @@ import { supabase } from '../lib/supabase';
 /**
  * useInvitado
  * ───────────────────────────────────────────────
- * Lee el parámetro ?ref= de la URL y consulta la
- * tabla `invitados` en Supabase para obtener los
- * datos del invitado.
- *
- * Estados posibles:
- *   loading: true  → consultando
- *   invitado: obj  → token válido, datos disponibles
- *   invitado: null → token ausente o inválido
- *   error: string  → fallo de red o DB
+ * Lee el parámetro ?ref= de la URL y consulta el
+ * invitado mediante la RPC segura `obtener_invitado`.
  */
 export function useInvitado() {
-    const [invitado, setInvitado] = useState(undefined); // undefined = aún no resuelto
+    const [invitado, setInvitado] = useState(undefined);
     const [loading, setLoading]   = useState(true);
     const [error, setError]       = useState(null);
 
@@ -29,7 +22,6 @@ export function useInvitado() {
             return;
         }
 
-        // Validar formato UUID básico antes de ir a la DB
         const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!UUID_REGEX.test(token)) {
             setInvitado(null);
@@ -39,15 +31,27 @@ export function useInvitado() {
 
         async function fetchInvitado() {
             try {
-                const { data, error: sbError } = await supabase
-                    .from('invitados')
-                    .select('*')
-                    .eq('token', token)
-                    .maybeSingle();
+                const { data, error: rpcError } = await supabase.rpc('obtener_invitado', {
+                    p_token: token,
+                });
 
-                if (sbError) throw sbError;
+                if (rpcError) {
+                    // Fallback temporal solo si aún no se ha ejecutado 004_integridad.sql
+                    if (rpcError.code === 'PGRST202' || rpcError.code === '42883') {
+                        const { data: fbData, error: fbError } = await supabase
+                            .from('invitados')
+                            .select('*')
+                            .eq('token', token)
+                            .maybeSingle();
+                        if (fbError) throw fbError;
+                        setInvitado(fbData ?? null);
+                        return;
+                    }
+                    throw rpcError;
+                }
 
-                setInvitado(data ?? null); // null si no existe el token
+                const row = Array.isArray(data) ? data[0] : data;
+                setInvitado(row ?? null);
             } catch (err) {
                 console.error('[useInvitado]', err);
                 setError(err.message ?? 'Error al cargar la invitación');

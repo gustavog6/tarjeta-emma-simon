@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Sparkles } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import { useCountdown } from '../hooks/useCountdown';
 import { downloadCalendarEvent } from '../utils/ics';
+import { parseFecha } from '../utils/fechas';
 import StoryBannerModal from './StoryBannerModal';
 
 const SaveTheDate = () => {
-    const { fecha, textos, venues, novios } = evento;
+    const { config } = useConfig();
+    const { fecha, textos, venues, novios } = config;
     const { titulo, diaSemana } = textos.saveTheDate;
     const timeLeft = useCountdown(fecha);
     const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 
-    const dateObj = new Date(fecha);
+    const dateObj = parseFecha(fecha) || new Date();
     const dia  = dateObj.getDate();
     const mes  = dateObj.toLocaleDateString('es-ES', { month: 'long' });
     const año  = dateObj.getFullYear();

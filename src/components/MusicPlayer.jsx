@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Music } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 
 /**
  * MusicPlayer
@@ -11,7 +11,8 @@ import { evento } from '../config/evento';
  * al abrir la invitación.
  */
 const MusicPlayer = ({ autoPlayOnMount = false }) => {
-    const { src } = evento.musica;
+    const { config } = useConfig();
+    const { src } = config.musica;
     const audioRef      = useRef(null);
     const [playing, setPlaying] = useState(false);
 

@@ -1,12 +1,13 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { UserRound } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import vestido from '../assets/vestido-verde.png';
 import camisa from '../assets/camisa-verde.png';
 
 const DressCode = () => {
-    const { tipo } = evento.vestimenta;
+    const { config } = useConfig();
+    const { tipo } = config.vestimenta;
 
     return (
         <motion.div

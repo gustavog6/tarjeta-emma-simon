@@ -1,9 +1,10 @@
 import React from 'react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import silhouetteWhite from '../assets/silueta de pareja wh.png';
 
 const Acknowledgements = () => {
-    const { versiculo, referencia } = evento.textos.footer;
+    const { config } = useConfig();
+    const { versiculo, referencia } = config.textos.footer;
 
     return (
         <footer className="py-20 bg-primary text-white text-center relative overflow-hidden">

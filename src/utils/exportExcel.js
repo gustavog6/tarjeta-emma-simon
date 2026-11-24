@@ -1,80 +1,115 @@
 /**
  * src/utils/exportExcel.js
- * Genera y descarga un archivo CSV compatible con Excel con BOM UTF-8
+ * Exporta confirmaciones a Excel (.xlsx real con SheetJS) con hoja de detalle y hoja de resumen para catering.
  */
-export function exportConfirmacionesToCSV(titularesAgrupados) {
-    const headers = [
-        'Grupo',
-        'Titular',
-        'Teléfono',
-        'Email',
-        'Acompañantes Extras (+N)',
-        'Capacidad Total Personas',
-        'Fotos Permitidas',
-        'Fotos Subidas',
-        'Tipo Asistente',
-        'Nombre Asistente',
-        'Plato Fuerte',
-        'Contornos',
-        'Regalo',
-        'Fecha Confirmación'
-    ];
+import * as XLSX from 'xlsx';
+import { labelOf, nombreCompletoDe } from './menu';
+
+export function buildConfirmacionesRows(titularesAgrupados, config) {
+    const platos = config?.menu?.platosFuertes || [];
+    const contornos = config?.menu?.contornos || [];
+    const nombreNovia = config?.novios?.novia?.nombre || 'Novia';
+    const nombreNovio = config?.novios?.novio?.nombre || 'Novio';
 
     const rows = [];
 
-    titularesAgrupados.forEach(grupo => {
-        const { titular, asistentes, fotosCount } = grupo;
+    titularesAgrupados.forEach(({ titular, asistentes, fotosCount }) => {
         const slotsVal = Number(titular.slots_totales ?? titular.slots ?? 0);
         const totalPases = 1 + slotsVal;
+        const grupoLabel = titular.grupo === 'novia' ? nombreNovia : nombreNovio;
+        const titularNombre = `${titular.nombre} ${titular.apellido}`.trim();
 
         if (asistentes.length === 0) {
-            // Si el titular no ha confirmado asistentes aún, listar fila base
-            rows.push([
-                `"${titular.grupo === 'novia' ? 'Novia' : 'Novio'}"`,
-                `"${titular.nombre} ${titular.apellido}"`,
-                `"${titular.telefono || ''}"`,
-                `"${titular.email || ''}"`,
-                slotsVal,
-                totalPases,
-                titular.puede_subir_fotos ? 'Sí' : 'No',
-                fotosCount || 0,
-                '"Pendiente"',
-                '"(Sin confirmar)"',
-                '"—"',
-                '"—"',
-                '"—"',
-                '""'
-            ]);
+            rows.push({
+                Grupo: grupoLabel,
+                Titular: titularNombre,
+                Teléfono: titular.telefono || '',
+                Email: titular.email || '',
+                'Acompañantes (+N)': slotsVal,
+                'Capacidad Total': totalPases,
+                'Fotos Permitidas': titular.puede_subir_fotos ? 'Sí' : 'No',
+                'Fotos Subidas': fotosCount || 0,
+                Rol: 'Pendiente',
+                Asistente: '(Sin confirmar)',
+                'Plato Fuerte': '—',
+                Contornos: '—',
+                'Fecha Confirmación': '',
+            });
         } else {
-            asistentes.forEach(asistente => {
-                rows.push([
-                    `"${titular.grupo === 'novia' ? 'Novia' : 'Novio'}"`,
-                    `"${titular.nombre} ${titular.apellido}"`,
-                    `"${titular.telefono || ''}"`,
-                    `"${titular.email || ''}"`,
-                    slotsVal,
-                    totalPases,
-                    titular.puede_subir_fotos ? 'Sí' : 'No',
-                    fotosCount || 0,
-                    asistente.es_titular ? '"Titular"' : '"Acompañante"',
-                    `"${asistente.nombre_completo}"`,
-                    `"${asistente.plato_fuerte || 'No especificado'}"`,
-                    `"${(asistente.contornos || []).join(' + ')}"`,
-                    `"${asistente.regalo_id || ''}"`,
-                    `"${asistente.created_at ? new Date(asistente.created_at).toLocaleString() : ''}"`
-                ]);
+            asistentes.forEach((asistente) => {
+                rows.push({
+                    Grupo: grupoLabel,
+                    Titular: titularNombre,
+                    Teléfono: titular.telefono || '',
+                    Email: titular.email || '',
+                    'Acompañantes (+N)': slotsVal,
+                    'Capacidad Total': totalPases,
+                    'Fotos Permitidas': titular.puede_subir_fotos ? 'Sí' : 'No',
+                    'Fotos Subidas': fotosCount || 0,
+                    Rol: asistente.es_titular ? 'Titular' : `Acomp. de ${titular.nombre}`,
+                    Asistente: nombreCompletoDe(asistente),
+                    'Plato Fuerte': labelOf(platos, asistente.plato_fuerte),
+                    Contornos: (asistente.contornos || []).map((id) => labelOf(contornos, id)).join(' + ') || '—',
+                    'Fecha Confirmación': asistente.created_at
+                        ? new Date(asistente.created_at).toLocaleString('es-ES')
+                        : '',
+                });
             });
         }
     });
 
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Confirmaciones_Boda_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    return rows;
+}
+
+export function exportConfirmacionesToXLSX(titularesAgrupados, config) {
+    const rows = buildConfirmacionesRows(titularesAgrupados, config);
+    const platos = config?.menu?.platosFuertes || [];
+    const contornos = config?.menu?.contornos || [];
+
+    // Hoja 1: Detalle
+    const wsDetalle = XLSX.utils.json_to_sheet(rows);
+    wsDetalle['!cols'] = [
+        { wch: 12 }, { wch: 24 }, { wch: 16 }, { wch: 24 },
+        { wch: 16 }, { wch: 14 }, { wch: 15 }, { wch: 13 },
+        { wch: 18 }, { wch: 24 }, { wch: 30 }, { wch: 32 }, { wch: 20 },
+    ];
+
+    // Hoja 2: Resumen de Catering (conteo por plato y por contorno)
+    const conteoPlatos = {};
+    const conteoContornos = {};
+    let totalConfirmados = 0;
+
+    titularesAgrupados.forEach(({ asistentes }) => {
+        asistentes.forEach((a) => {
+            totalConfirmados++;
+            const p = labelOf(platos, a.plato_fuerte);
+            conteoPlatos[p] = (conteoPlatos[p] || 0) + 1;
+            (a.contornos || []).forEach((id) => {
+                const c = labelOf(contornos, id);
+                conteoContornos[c] = (conteoContornos[c] || 0) + 1;
+            });
+        });
+    });
+
+    const resumenRows = [
+        { Categoría: 'RESUMEN GENERAL', Ítem: 'Total familias (filtro)', Cantidad: titularesAgrupados.length },
+        {
+            Categoría: 'RESUMEN GENERAL',
+            Ítem: 'Total pases potenciales',
+            Cantidad: titularesAgrupados.reduce((acc, g) => acc + 1 + Number(g.titular.slots_totales ?? g.titular.slots ?? 0), 0),
+        },
+        { Categoría: 'RESUMEN GENERAL', Ítem: 'Total personas confirmadas', Cantidad: totalConfirmados },
+        ...Object.entries(conteoPlatos).map(([k, v]) => ({ Categoría: 'Plato Fuerte', Ítem: k, Cantidad: v })),
+        ...Object.entries(conteoContornos).map(([k, v]) => ({ Categoría: 'Contorno', Ítem: k, Cantidad: v })),
+    ];
+
+    const wsResumen = XLSX.utils.json_to_sheet(resumenRows);
+    wsResumen['!cols'] = [{ wch: 20 }, { wch: 36 }, { wch: 12 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsDetalle, 'Confirmaciones');
+    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen Catering');
+
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Confirmaciones_Boda_${fecha}.xlsx`);
 }

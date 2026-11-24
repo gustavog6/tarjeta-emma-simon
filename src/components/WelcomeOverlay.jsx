@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import goldSilhouette from '../assets/corazon-verde-solo-2.png';
 
 /**
@@ -12,8 +12,9 @@ import goldSilhouette from '../assets/corazon-verde-solo-2.png';
  * al usuario alternar a silenciar con un botón claro.
  */
 const WelcomeOverlay = ({ onEnter }) => {
-    const { novia, novio } = evento.novios;
-    const { boton } = evento.textos.overlay;
+    const { config } = useConfig();
+    const { novia, novio } = config.novios;
+    const { boton } = config.textos.overlay;
     const [soundEnabled, setSoundEnabled] = useState(true);
 
     const handleOpen = () => {

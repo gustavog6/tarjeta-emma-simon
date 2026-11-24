@@ -1,90 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import {
     Check, X, Shield, Users, Image as ImageIcon, RefreshCw,
-    Download, MessageCircle, Edit2, Trash2, AlertTriangle, RotateCcw,
-    Plus, Minus, Camera, Phone, User, UserPlus, Copy, ExternalLink, Link, Settings, Save
+    Download, FileText, MessageCircle, Edit2, Trash2, AlertTriangle, RotateCcw,
+    Plus, Minus, Camera, UserPlus, Copy, Settings, LogOut, UserCheck
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { exportConfirmacionesToCSV } from '../utils/exportExcel';
+import { exportConfirmacionesToXLSX } from '../utils/exportExcel';
+import { exportConfirmacionesToPDF } from '../utils/exportPdf';
 import { useConfig } from '../context/ConfigContext';
+import { formatFechaLarga } from '../utils/fechas';
+import { labelOf, canonicalId, nombreApellidoDe, nombreCompletoDe } from '../utils/menu';
+import { friendlyError } from '../utils/errores';
+import ConfigTab from './ConfigTab';
 
-const AdminPanel = () => {
-    const { config, saveConfig, reloadConfig } = useConfig();
+const DEFAULT_PLANTILLA_WA =
+    '¡Hola {nombre}! Estamos muy felices de compartir nuestro día contigo. Esta invitación es válida para {personas}. Confírmanos tu asistencia y menú antes del {fecha_limite}. Nos vemos pronto. Con amor, {novios} ✨\n\n{enlace}';
+
+const AdminPanel = ({ user, onLogout }) => {
+    const { config } = useConfig();
     const [tab, setTab] = useState('confirmaciones'); // 'confirmaciones' | 'invitados' | 'fotos' | 'configuracion'
     const [fotoFilter, setFotoFilter] = useState('pendiente'); // 'todas' | 'pendiente' | 'aprobada' | 'rechazada'
     const [grupoFilter, setGrupoFilter] = useState('todos'); // 'todos' | 'novia' | 'novio'
-    const [expandedRows, setExpandedRows] = useState({}); // { [titularId]: boolean }
+    const [expandedRows, setExpandedRows] = useState({});
 
     const [invitados, setInvitados] = useState([]);
     const [confirmaciones, setConfirmaciones] = useState([]);
     const [fotos, setFotos] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [bannerError, setBannerError] = useState(null);
 
-    // Modales de acción
-    const [editAsistenteItem, setEditAsistenteItem] = useState(null);
-    const [addAsistenteTitular, setAddAsistenteTitular] = useState(null); // Titular objeto al que se agrega acompañante
+    // Modales
+    const [asistenteModal, setAsistenteModal] = useState(null);
+    // { mode: 'create' | 'edit', titular, id?, es_titular, nombre, apellido, plato_fuerte, contornos: [] }
     const [guestModal, setGuestModal] = useState({ isOpen: false, mode: 'create', data: null });
     const [whatsAppModal, setWhatsAppModal] = useState({ isOpen: false, invitado: null, message: '', phone: '' });
-    const [deleteItem, setDeleteItem] = useState(null); // { type: 'confirmacion' | 'titular' | 'reset_confirmacion', id, name }
+    const [deleteItem, setDeleteItem] = useState(null);
+    // { type: 'confirmacion' | 'titular' | 'reset_confirmacion', id, invitadoId?, name, extraInfo? }
     const [actionLoading, setActionLoading] = useState(false);
     const [copiedToken, setCopiedToken] = useState(null);
 
-    // Estado local para formulario de configuración (Tab 4)
-    const [configForm, setConfigForm] = useState(config);
-    const [configSaveStatus, setConfigSaveStatus] = useState({ loading: false, msg: null, error: false });
-
-    // Sincronizar formulario si config cambia externamente
-    useEffect(() => {
-        setConfigForm(config);
-    }, [config]);
-
-    const { novios, fechaLimiteRsvp, menu } = config;
+    const { novios, fechaLimiteRsvp, menu, urlPublica, plantillaWhatsapp } = config;
     const nombreNovia = novios?.novia?.nombre || 'Novia';
     const nombreNovio = novios?.novio?.nombre || 'Novio';
     const nombresNovios = `${nombreNovio} & ${nombreNovia}`;
+    const platosList = menu?.platosFuertes || [];
+    const contornosList = menu?.contornos || [];
+    const maxContornos = menu?.maxContornos ?? 2;
 
-    // Fecha límite formateada
-    const fechaLimiteStr = new Date(fechaLimiteRsvp || Date.now()).toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    });
+    const fechaLimiteStr = formatFechaLarga(fechaLimiteRsvp);
+    const publicBaseUrl = (urlPublica || window.location.origin).replace(/\/+$/, '');
 
     const loadData = async () => {
         if (!supabase) return;
         setLoading(true);
+        setBannerError(null);
 
         try {
-            // 1. Invitados
-            const { data: invData } = await supabase
-                .from('invitados')
-                .select('*')
-                .order('created_at', { ascending: false });
+            const [invRes, confRes, fotosRes] = await Promise.all([
+                supabase.from('invitados').select('*').order('created_at', { ascending: false }),
+                supabase.from('confirmaciones').select('*').order('created_at', { ascending: true }),
+                supabase.from('fotos').select('*, invitados(nombre, apellido)').order('created_at', { ascending: false }),
+            ]);
 
-            if (invData) {
-                setInvitados(invData);
-                // Expandir por defecto las filas
-                const initialExpanded = {};
-                invData.forEach(inv => { initialExpanded[inv.id] = true; });
-                setExpandedRows(initialExpanded);
+            if (invRes.error) throw invRes.error;
+            if (confRes.error) throw confRes.error;
+            if (fotosRes.error) throw fotosRes.error;
+
+            if (invRes.data) {
+                setInvitados(invRes.data);
+                setExpandedRows((prev) => {
+                    const next = { ...prev };
+                    invRes.data.forEach((inv) => {
+                        if (next[inv.id] === undefined) next[inv.id] = true;
+                    });
+                    return next;
+                });
             }
-
-            // 2. Confirmaciones
-            const { data: confData } = await supabase
-                .from('confirmaciones')
-                .select('*')
-                .order('created_at', { ascending: true });
-
-            if (confData) setConfirmaciones(confData);
-
-            // 3. Fotos
-            const { data: fotosData } = await supabase
-                .from('fotos')
-                .select('*, invitados(nombre, apellido)')
-                .order('created_at', { ascending: false });
-
-            if (fotosData) {
-                const mapped = fotosData.map(f => {
+            if (confRes.data) setConfirmaciones(confRes.data);
+            if (fotosRes.data) {
+                const mapped = fotosRes.data.map((f) => {
                     const { data: pubData } = supabase.storage.from('galeria').getPublicUrl(f.storage_path);
                     return { ...f, url: pubData.publicUrl };
                 });
@@ -92,6 +86,7 @@ const AdminPanel = () => {
             }
         } catch (err) {
             console.error('[AdminPanel] Error loading data:', err);
+            setBannerError(friendlyError(err));
         } finally {
             setLoading(false);
         }
@@ -102,18 +97,17 @@ const AdminPanel = () => {
     }, []);
 
     const toggleRow = (id) => {
-        setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+        setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
     const toggleAllRows = (expand) => {
         const next = {};
-        invitados.forEach(inv => { next[inv.id] = expand; });
+        invitados.forEach((inv) => { next[inv.id] = expand; });
         setExpandedRows(next);
     };
 
     const copyInviteLink = (token, id) => {
-        const baseUrl = window.location.origin;
-        const link = `${baseUrl}/?ref=${token}`;
+        const link = `${publicBaseUrl}/?ref=${token}`;
         navigator.clipboard.writeText(link);
         setCopiedToken(id);
         setTimeout(() => setCopiedToken(null), 2000);
@@ -123,16 +117,22 @@ const AdminPanel = () => {
     const openWhatsAppModal = (invitado) => {
         const slotsVal = Number(invitado.slots_totales ?? invitado.slots ?? 0);
         const totalPases = 1 + slotsVal;
-        const baseUrl = window.location.origin;
-        const inviteLink = `${baseUrl}/?ref=${invitado.token}`;
+        const personasTxt = `${totalPases} persona${totalPases > 1 ? 's' : ''}`;
+        const inviteLink = `${publicBaseUrl}/?ref=${invitado.token}`;
 
-        const template = `¡Hola ${invitado.nombre}! Estamos muy felices de compartir nuestro día contigo. Esta invitación es válida para ${totalPases} persona${totalPases > 1 ? 's' : ''}. Confírmanos tu asistencia y menú antes del ${fechaLimiteStr}. Nos vemos pronto. Con amor, ${nombresNovios} ✨\n\n${inviteLink}`;
+        const tpl = plantillaWhatsapp || DEFAULT_PLANTILLA_WA;
+        const message = tpl
+            .replace(/\{nombre\}/g, invitado.nombre || '')
+            .replace(/\{personas\}/g, personasTxt)
+            .replace(/\{fecha_limite\}/g, fechaLimiteStr || '')
+            .replace(/\{novios\}/g, nombresNovios)
+            .replace(/\{enlace\}/g, inviteLink);
 
         setWhatsAppModal({
             isOpen: true,
             invitado,
             phone: (invitado.telefono || '').replace(/[^0-9]/g, ''),
-            message: template
+            message,
         });
     };
 
@@ -146,21 +146,31 @@ const AdminPanel = () => {
         setWhatsAppModal({ isOpen: false, invitado: null, message: '', phone: '' });
     };
 
-    // ─── Guardar / Crear Invitado (con validación de campos obligatorios) ─────
+    // ─── Guardar / Crear Invitado Titular ──────────────────────────
     const handleSaveGuest = async (e) => {
         e.preventDefault();
         const formData = guestModal.data;
 
-        // Validación estricta: nombre, apellido, teléfono y grupo son obligatorios
         if (!formData.nombre?.trim() || !formData.apellido?.trim() || !formData.telefono?.trim() || !formData.grupo) {
             alert('Nombre, Apellido, Teléfono y Grupo son campos estrictamente obligatorios.');
             return;
         }
 
-        setActionLoading(true);
+        const slotsCount = Math.max(0, Number(formData.slots_totales ?? formData.slots ?? 0));
 
+        // Validar antes de bajar slots_totales por debajo de los asistentes ya confirmados
+        if (guestModal.mode === 'edit') {
+            const confirmadosActuales = confirmaciones.filter((c) => c.invitado_id === formData.id).length;
+            if (1 + slotsCount < confirmadosActuales) {
+                alert(
+                    `Este invitado ya tiene ${confirmadosActuales} persona(s) confirmada(s). No puedes reducir su capacidad a ${1 + slotsCount}. Elimina primero los asistentes sobrantes.`
+                );
+                return;
+            }
+        }
+
+        setActionLoading(true);
         try {
-            const slotsCount = Number(formData.slots_totales ?? formData.slots ?? 0);
             if (guestModal.mode === 'create') {
                 const newRow = {
                     nombre: formData.nombre.trim(),
@@ -174,134 +184,208 @@ const AdminPanel = () => {
                 const { data, error } = await supabase.from('invitados').insert([newRow]).select();
                 if (error) throw error;
                 if (data && data[0]) {
-                    setInvitados(prev => [data[0], ...prev]);
+                    setInvitados((prev) => [data[0], ...prev]);
+                    setExpandedRows((prev) => ({ ...prev, [data[0].id]: true }));
                 }
             } else if (guestModal.mode === 'edit') {
-                const { error } = await supabase.from('invitados').update({
-                    nombre: formData.nombre.trim(),
-                    apellido: formData.apellido.trim(),
-                    telefono: formData.telefono.trim(),
-                    email: formData.email?.trim() || null,
-                    grupo: formData.grupo,
-                    slots_totales: slotsCount,
-                    puede_subir_fotos: Boolean(formData.puede_subir_fotos),
-                }).eq('id', formData.id);
+                const { data, error } = await supabase
+                    .from('invitados')
+                    .update({
+                        nombre: formData.nombre.trim(),
+                        apellido: formData.apellido.trim(),
+                        telefono: formData.telefono.trim(),
+                        email: formData.email?.trim() || null,
+                        grupo: formData.grupo,
+                        slots_totales: slotsCount,
+                        puede_subir_fotos: Boolean(formData.puede_subir_fotos),
+                    })
+                    .eq('id', formData.id)
+                    .select();
 
                 if (error) throw error;
-                setInvitados(prev => prev.map(inv => inv.id === formData.id ? {
-                    ...inv,
-                    ...formData,
-                    slots_totales: slotsCount,
-                    slots: slotsCount
-                } : inv));
+                const updated = data?.[0];
+                setInvitados((prev) =>
+                    prev.map((inv) =>
+                        inv.id === formData.id
+                            ? updated || { ...inv, ...formData, slots_totales: slotsCount }
+                            : inv
+                    )
+                );
             }
 
             setGuestModal({ isOpen: false, mode: 'create', data: null });
         } catch (err) {
             console.error('Error saving guest:', err);
-            alert('Error al guardar el invitado: ' + err.message);
+            alert(friendlyError(err));
         } finally {
             setActionLoading(false);
         }
     };
 
-    // ─── Edición de Asistente de Confirmación ──────────────────────────────
-    const handleSaveAsistenteEdit = async (e) => {
+    // ─── Abrir Modal de Asistente (Crear Acompañante / Re-agregar Titular / Editar) ──
+    const openCreateAsistente = (titular, esTitular = false) => {
+        setAsistenteModal({
+            mode: 'create',
+            titular,
+            es_titular: esTitular,
+            nombre: esTitular ? titular.nombre : '',
+            apellido: esTitular ? titular.apellido : '',
+            plato_fuerte: platosList[0]?.id || '',
+            contornos: [],
+        });
+    };
+
+    const openEditAsistente = (titular, asistente) => {
+        const { nombre, apellido } = nombreApellidoDe(asistente);
+        setAsistenteModal({
+            mode: 'edit',
+            titular,
+            id: asistente.id,
+            es_titular: Boolean(asistente.es_titular),
+            nombre,
+            apellido,
+            plato_fuerte: canonicalId(platosList, asistente.plato_fuerte) || '',
+            contornos: (asistente.contornos || []).map((c) => canonicalId(contornosList, c)),
+        });
+    };
+
+    const toggleModalContorno = (contornoId) => {
+        setAsistenteModal((prev) => {
+            if (!prev) return prev;
+            const exists = prev.contornos.includes(contornoId);
+            if (exists) {
+                return { ...prev, contornos: prev.contornos.filter((id) => id !== contornoId) };
+            }
+            if (prev.contornos.length >= maxContornos) return prev;
+            return { ...prev, contornos: [...prev.contornos, contornoId] };
+        });
+    };
+
+    const handleSaveAsistente = async (e) => {
         e.preventDefault();
-        if (!editAsistenteItem) return;
-        if (!editAsistenteItem.nombre_completo?.trim()) {
-            alert('El nombre del asistente es obligatorio.');
+        if (!asistenteModal) return;
+
+        const nombre = asistenteModal.nombre?.trim();
+        const apellido = asistenteModal.apellido?.trim();
+        if (!nombre || !apellido) {
+            alert('Nombre y Apellido son obligatorios.');
             return;
         }
-        setActionLoading(true);
-
-        try {
-            await supabase.from('confirmaciones').update({
-                nombre_completo: editAsistenteItem.nombre_completo.trim(),
-                plato_fuerte: editAsistenteItem.plato_fuerte,
-                contornos: editAsistenteItem.contornos
-            }).eq('id', editAsistenteItem.id);
-
-            setConfirmaciones(prev => prev.map(c => c.id === editAsistenteItem.id ? editAsistenteItem : c));
-            setEditAsistenteItem(null);
-        } catch (err) {
-            console.error('Error updating confirmacion:', err);
-        } finally {
-            setActionLoading(false);
+        if (!asistenteModal.plato_fuerte) {
+            alert('Debes seleccionar un plato fuerte.');
+            return;
         }
-    };
-
-    // ─── Agregar Acompañante Manual a un Titular ───────────────────
-    const handleAddAsistenteManual = async (e) => {
-        e.preventDefault();
-        if (!addAsistenteTitular) return;
-        const nombre = addAsistenteTitular.nombreNuevo?.trim();
-        if (!nombre) {
-            alert('El nombre del acompañante es obligatorio.');
+        if (maxContornos > 0 && contornosList.length >= maxContornos && asistenteModal.contornos.length !== maxContornos) {
+            alert(`Debes seleccionar exactamente ${maxContornos} contorno(s).`);
             return;
         }
 
         setActionLoading(true);
         try {
-            const newAsistente = {
-                invitado_id: addAsistenteTitular.id,
-                nombre_completo: nombre,
-                es_titular: false,
-                plato_fuerte: addAsistenteTitular.plato_fuerte || null,
-                contornos: addAsistenteTitular.contornos || []
-            };
+            const nombreCompleto = `${nombre} ${apellido}`;
 
-            const { data, error } = await supabase.from('confirmaciones').insert([newAsistente]).select();
-            if (error) throw error;
+            if (asistenteModal.mode === 'create') {
+                const payload = {
+                    invitado_id: asistenteModal.titular.id,
+                    nombre,
+                    apellido,
+                    nombre_completo: nombreCompleto,
+                    es_titular: Boolean(asistenteModal.es_titular),
+                    plato_fuerte: asistenteModal.plato_fuerte,
+                    contornos: asistenteModal.contornos,
+                };
+                const { data, error } = await supabase.from('confirmaciones').insert([payload]).select();
+                if (error) throw error;
 
-            if (data && data[0]) {
-                setConfirmaciones(prev => [...prev, data[0]]);
+                if (data && data[0]) {
+                    setConfirmaciones((prev) => [...prev, data[0]]);
+                }
+                if (!asistenteModal.titular.confirmed_at) {
+                    const nowIso = new Date().toISOString();
+                    setInvitados((prev) =>
+                        prev.map((i) => (i.id === asistenteModal.titular.id ? { ...i, confirmed_at: nowIso } : i))
+                    );
+                }
+            } else {
+                const payload = {
+                    nombre,
+                    apellido,
+                    nombre_completo: nombreCompleto,
+                    plato_fuerte: asistenteModal.plato_fuerte,
+                    contornos: asistenteModal.contornos,
+                };
+                const { data, error } = await supabase
+                    .from('confirmaciones')
+                    .update(payload)
+                    .eq('id', asistenteModal.id)
+                    .select();
+                if (error) throw error;
+
+                const updated = data?.[0];
+                setConfirmaciones((prev) =>
+                    prev.map((c) => (c.id === asistenteModal.id ? updated || { ...c, ...payload } : c))
+                );
             }
 
-            // Si el titular no tenía confirmed_at, marcarlo como confirmado
-            if (!addAsistenteTitular.confirmed_at) {
-                const nowIso = new Date().toISOString();
-                await supabase.from('invitados').update({ confirmed_at: nowIso }).eq('id', addAsistenteTitular.id);
-                setInvitados(prev => prev.map(i => i.id === addAsistenteTitular.id ? { ...i, confirmed_at: nowIso } : i));
-            }
-
-            setAddAsistenteTitular(null);
+            setAsistenteModal(null);
         } catch (err) {
-            console.error('Error adding asistente:', err);
-            alert('Error al agregar acompañante: ' + err.message);
+            console.error('Error saving asistente:', err);
+            alert(friendlyError(err));
         } finally {
             setActionLoading(false);
         }
     };
 
-    // ─── Eliminación / Reseteo con Integridad Garantizada ─────────────
+    // ─── Eliminación / Reseteo con Integridad Garantizada ──────────
     const handleDeleteConfirm = async () => {
         if (!deleteItem) return;
         setActionLoading(true);
 
         try {
             if (deleteItem.type === 'confirmacion') {
-                // Borrar solo una confirmación individual (un acompañante)
-                await supabase.from('confirmaciones').delete().eq('id', deleteItem.id);
-                setConfirmaciones(prev => prev.filter(c => c.id !== deleteItem.id));
-            } else if (deleteItem.type === 'reset_confirmacion') {
-                // INTEGRIDAD ESTRICTA: Borrar confirmaciones de este titular y limpiar confirmed_at,
-                // PERO NUNCA BORRAR EL INVITADO DE LA TABLA INVITADOS.
-                await supabase.from('confirmaciones').delete().eq('invitado_id', deleteItem.id);
-                await supabase.from('invitados').update({ confirmed_at: null }).eq('id', deleteItem.id);
+                const { error } = await supabase.from('confirmaciones').delete().eq('id', deleteItem.id);
+                if (error) throw error;
 
-                setConfirmaciones(prev => prev.filter(c => c.invitado_id !== deleteItem.id));
-                setInvitados(prev => prev.map(i => i.id === deleteItem.id ? { ...i, confirmed_at: null } : i));
+                const remaining = confirmaciones.filter((c) => c.id !== deleteItem.id);
+                setConfirmaciones(remaining);
+
+                // Si quedó en 0 asistentes para ese titular, limpiar confirmed_at en el estado local (el trigger lo hace en BD)
+                const quedanDelTitular = remaining.some((c) => c.invitado_id === deleteItem.invitadoId);
+                if (!quedanDelTitular && deleteItem.invitadoId) {
+                    setInvitados((prev) =>
+                        prev.map((i) => (i.id === deleteItem.invitadoId ? { ...i, confirmed_at: null } : i))
+                    );
+                }
+            } else if (deleteItem.type === 'reset_confirmacion') {
+                // RPC atómica: borra confirmaciones y limpia confirmed_at; NUNCA borra al invitado
+                const { error } = await supabase.rpc('reiniciar_confirmacion', {
+                    p_invitado: deleteItem.id,
+                });
+                if (error) throw error;
+
+                setConfirmaciones((prev) => prev.filter((c) => c.invitado_id !== deleteItem.id));
+                setInvitados((prev) => prev.map((i) => (i.id === deleteItem.id ? { ...i, confirmed_at: null } : i)));
             } else if (deleteItem.type === 'titular') {
-                // Borrado maestro de la lista de invitados (desde la tab de invitados)
-                await supabase.from('invitados').delete().eq('id', deleteItem.id);
-                setInvitados(prev => prev.filter(i => i.id !== deleteItem.id));
-                setConfirmaciones(prev => prev.filter(c => c.invitado_id !== deleteItem.id));
+                // Borrar primero archivos en Storage del invitado para no dejar huérfanos
+                const fotosDelTitular = fotos.filter((f) => f.invitado_id === deleteItem.id);
+                if (fotosDelTitular.length > 0) {
+                    const paths = fotosDelTitular.map((f) => f.storage_path).filter(Boolean);
+                    if (paths.length > 0) {
+                        await supabase.storage.from('galeria').remove(paths);
+                    }
+                }
+
+                const { error } = await supabase.from('invitados').delete().eq('id', deleteItem.id);
+                if (error) throw error;
+
+                setInvitados((prev) => prev.filter((i) => i.id !== deleteItem.id));
+                setConfirmaciones((prev) => prev.filter((c) => c.invitado_id !== deleteItem.id));
+                setFotos((prev) => prev.filter((f) => f.invitado_id !== deleteItem.id));
             }
             setDeleteItem(null);
         } catch (err) {
             console.error('Error handling delete:', err);
-            alert('Error al procesar la acción: ' + err.message);
+            alert(friendlyError(err));
         } finally {
             setActionLoading(false);
         }
@@ -310,46 +394,36 @@ const AdminPanel = () => {
     // ─── Gestión de Fotos ──────────────────────────────────────────
     const updateFotoEstado = async (id, estado) => {
         try {
-            await supabase.from('fotos').update({ estado }).eq('id', id);
-            setFotos(prev => prev.map(f => f.id === id ? { ...f, estado } : f));
+            const { error } = await supabase.from('fotos').update({ estado }).eq('id', id);
+            if (error) throw error;
+            setFotos((prev) => prev.map((f) => (f.id === id ? { ...f, estado } : f)));
         } catch (err) {
             console.error('Error updating foto:', err);
-        }
-    };
-
-    // ─── Guardar Configuración Dinámica ────────────────────────────
-    const handleSaveConfig = async (e) => {
-        e.preventDefault();
-        setConfigSaveStatus({ loading: true, msg: null, error: false });
-        const res = await saveConfig(configForm);
-        if (res.success) {
-            setConfigSaveStatus({ loading: false, msg: '¡Configuración guardada exitosamente en Supabase!', error: false });
-            setTimeout(() => setConfigSaveStatus({ loading: false, msg: null, error: false }), 4000);
-        } else {
-            setConfigSaveStatus({ loading: false, msg: 'Error al guardar: ' + res.error, error: true });
+            alert(friendlyError(err));
         }
     };
 
     // ─── Agrupación y Cálculos de Totales ──────────────────────────
-    const titularesAgrupados = invitados.map(titular => {
-        const asistentes = confirmaciones.filter(c => c.invitado_id === titular.id);
-        const fotosSubidas = fotos.filter(f => f.invitado_id === titular.id);
-        return {
-            titular,
-            asistentes,
-            fotosCount: fotosSubidas.length
-        };
-    }).filter(grupo => {
-        if (grupoFilter === 'todos') return true;
-        return grupo.titular.grupo === grupoFilter;
-    });
+    const titularesAgrupados = invitados
+        .map((titular) => {
+            const asistentes = confirmaciones.filter((c) => c.invitado_id === titular.id);
+            const fotosSubidas = fotos.filter((f) => f.invitado_id === titular.id);
+            return {
+                titular,
+                asistentes,
+                fotosCount: fotosSubidas.length,
+            };
+        })
+        .filter((grupo) => {
+            if (grupoFilter === 'todos') return true;
+            return grupo.titular.grupo === grupoFilter;
+        });
 
-    const fotosFiltradas = fotos.filter(f => {
+    const fotosFiltradas = fotos.filter((f) => {
         if (fotoFilter === 'todas') return true;
         return f.estado === fotoFilter;
     });
 
-    // Totales calculados con precisión (1 titular + slots_totales)
     const totalPasesPotenciales = titularesAgrupados.reduce((acc, g) => {
         const s = Number(g.titular.slots_totales ?? g.titular.slots ?? 0);
         return acc + 1 + s;
@@ -368,11 +442,13 @@ const AdminPanel = () => {
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-gray-900 leading-tight">Panel de Administración</h1>
-                            <p className="text-xs text-gray-500">Gestión de invitados, confirmaciones, fotos y configuración dinámica</p>
+                            <p className="text-xs text-gray-500">
+                                {user?.email ? `Sesión: ${user.email}` : 'Gestión de invitados, confirmaciones, fotos y configuración'}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <button
                             onClick={loadData}
                             className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
@@ -386,8 +462,27 @@ const AdminPanel = () => {
                         >
                             Ver Invitación
                         </a>
+                        {onLogout && (
+                            <button
+                                onClick={onLogout}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Cerrar sesión"
+                            >
+                                <LogOut size={14} />
+                                Salir
+                            </button>
+                        )}
                     </div>
                 </div>
+
+                {bannerError && (
+                    <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between gap-2">
+                        <span><strong>Error al cargar datos:</strong> {bannerError}</span>
+                        <button onClick={() => setBannerError(null)} className="p-1 hover:bg-red-100 rounded cursor-pointer">
+                            <X size={14} />
+                        </button>
+                    </div>
+                )}
 
                 {/* Tabs Principales */}
                 <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-200 pb-2">
@@ -398,7 +493,7 @@ const AdminPanel = () => {
                         }`}
                     >
                         <Users size={15} />
-                        Confirmaciones ({totalAsistentesConfirmados} confirmados)
+                        Confirmaciones ({totalAsistentesConfirmados})
                     </button>
 
                     <button
@@ -408,7 +503,7 @@ const AdminPanel = () => {
                         }`}
                     >
                         <UserPlus size={15} />
-                        Gestión de Invitados ({invitados.length} familias)
+                        Gestión de Invitados ({invitados.length})
                     </button>
 
                     <button
@@ -418,7 +513,7 @@ const AdminPanel = () => {
                         }`}
                     >
                         <ImageIcon size={15} />
-                        Fotos ({fotos.filter(f => f.estado === 'pendiente').length} pendientes)
+                        Fotos ({fotos.filter((f) => f.estado === 'pendiente').length} pendientes)
                     </button>
 
                     <button
@@ -428,26 +523,24 @@ const AdminPanel = () => {
                         }`}
                     >
                         <Settings size={15} />
-                        ⚙️ Configuración del Evento
+                        Configuración
                     </button>
                 </div>
 
                 {/* ════════════════════════════════════════════════════════════
-                    TAB 1: CONFIRMACIONES EN ÁRBOL (NESTED ROWS CON PROTECCIÓN)
+                    TAB 1: CONFIRMACIONES EN ÁRBOL (NESTED ROWS)
                 ════════════════════════════════════════════════════════════ */}
                 {tab === 'confirmaciones' && (
                     <div className="space-y-3">
-                        {/* Barra de Filtros, Acciones y Exportar */}
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-gray-200">
-                            {/* Filtro por Grupo Dinámico */}
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Grupo:</span>
                                 <div className="flex gap-1">
                                     {[
                                         { id: 'todos', label: 'Todos' },
                                         { id: 'novia', label: nombreNovia },
-                                        { id: 'novio', label: nombreNovio }
-                                    ].map(g => (
+                                        { id: 'novio', label: nombreNovio },
+                                    ].map((g) => (
                                         <button
                                             key={g.id}
                                             onClick={() => setGrupoFilter(g.id)}
@@ -463,34 +556,36 @@ const AdminPanel = () => {
                                 </div>
                             </div>
 
-                            {/* Controles de Vista y Exportación */}
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <button
                                     onClick={() => toggleAllRows(true)}
                                     className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded border border-gray-200 cursor-pointer"
-                                    title="Desplegar todos los acompañantes"
                                 >
                                     Expandir todo
                                 </button>
                                 <button
                                     onClick={() => toggleAllRows(false)}
                                     className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded border border-gray-200 cursor-pointer"
-                                    title="Colapsar todos los acompañantes"
                                 >
                                     Colapsar
                                 </button>
-
                                 <button
-                                    onClick={() => exportConfirmacionesToCSV(titularesAgrupados)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-700 hover:bg-green-800 text-white rounded text-xs font-bold transition-colors cursor-pointer ml-1"
+                                    onClick={() => exportConfirmacionesToXLSX(titularesAgrupados, config)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-700 hover:bg-green-800 text-white rounded text-xs font-bold transition-colors cursor-pointer"
                                 >
                                     <Download size={13} />
-                                    Exportar (.csv)
+                                    Excel (.xlsx)
+                                </button>
+                                <button
+                                    onClick={() => exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilter)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-800 hover:bg-gray-900 text-white rounded text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                    <FileText size={13} />
+                                    PDF (.pdf)
                                 </button>
                             </div>
                         </div>
 
-                        {/* TABLA PRINCIPAL CON NESTED ROWS Y FOOTER DE SUMATORIA */}
                         <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-xs border-collapse">
@@ -519,46 +614,43 @@ const AdminPanel = () => {
                                             titularesAgrupados.map(({ titular, asistentes, fotosCount }) => {
                                                 const isExpanded = Boolean(expandedRows[titular.id]);
                                                 const hasAsistentes = asistentes.length > 0;
+                                                const hasTitularRow = asistentes.some((a) => a.es_titular);
                                                 const slotsCount = Number(titular.slots_totales ?? titular.slots ?? 0);
                                                 const totalPases = 1 + slotsCount;
+                                                const cupoLleno = asistentes.length >= totalPases;
 
                                                 return (
                                                     <React.Fragment key={titular.id}>
-                                                        {/* FILA PRINCIPAL (TITULAR) */}
                                                         <tr className={`hover:bg-gray-50/80 transition-colors ${isExpanded ? 'bg-gray-50/40' : ''}`}>
-                                                            {/* Botón Expandir/Colapsar */}
                                                             <td className="px-3 py-2 text-center align-middle">
                                                                 <button
                                                                     onClick={() => toggleRow(titular.id)}
                                                                     className="w-5 h-5 inline-flex items-center justify-center rounded border border-gray-300 text-gray-500 hover:border-primary hover:text-primary transition-colors cursor-pointer bg-white"
-                                                                    title={isExpanded ? 'Colapsar acompañantes' : 'Ver acompañantes'}
                                                                 >
                                                                     {isExpanded ? <Minus size={11} /> : <Plus size={11} />}
                                                                 </button>
                                                             </td>
 
-                                                            {/* Nombre Titular */}
                                                             <td className="px-3 py-2 font-semibold text-gray-900 whitespace-nowrap align-middle">
                                                                 {titular.nombre} {titular.apellido}
                                                             </td>
 
-                                                            {/* Badge de Grupo */}
                                                             <td className="px-3 py-2 align-middle">
-                                                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                                                    titular.grupo === 'novia'
-                                                                        ? 'bg-pink-100 text-pink-700'
-                                                                        : 'bg-blue-100 text-blue-700'
-                                                                }`}>
+                                                                <span
+                                                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                                        titular.grupo === 'novia'
+                                                                            ? 'bg-pink-100 text-pink-700'
+                                                                            : 'bg-blue-100 text-blue-700'
+                                                                    }`}
+                                                                >
                                                                     {titular.grupo === 'novia' ? nombreNovia : nombreNovio}
                                                                 </span>
                                                             </td>
 
-                                                            {/* Teléfono */}
                                                             <td className="px-3 py-2 text-gray-600 font-mono text-[11px] align-middle">
                                                                 {titular.telefono || '—'}
                                                             </td>
 
-                                                            {/* Pases Totales Representados (1 titular + slots_totales) */}
                                                             <td className="px-3 py-2 font-medium text-gray-700 align-middle">
                                                                 <span className="font-bold text-gray-900">{totalPases} pases</span>
                                                                 <span className="text-gray-400 text-[10px] block">
@@ -566,18 +658,18 @@ const AdminPanel = () => {
                                                                 </span>
                                                             </td>
 
-                                                            {/* Asistentes Confirmados */}
                                                             <td className="px-3 py-2 align-middle">
-                                                                <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                                                    asistentes.length > 0
-                                                                        ? 'bg-green-50 text-green-700 border border-green-200'
-                                                                        : 'bg-gray-100 text-gray-400'
-                                                                }`}>
-                                                                    {asistentes.length} / {totalPases} {asistentes.length === 1 ? 'persona' : 'personas'}
+                                                                <span
+                                                                    className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
+                                                                        asistentes.length > 0
+                                                                            ? 'bg-green-50 text-green-700 border border-green-200'
+                                                                            : 'bg-gray-100 text-gray-400'
+                                                                    }`}
+                                                                >
+                                                                    {asistentes.length} / {totalPases}
                                                                 </span>
                                                             </td>
 
-                                                            {/* Estado de Fotos */}
                                                             <td className="px-3 py-2 text-gray-600 align-middle">
                                                                 {fotosCount > 0 ? (
                                                                     <span className="inline-flex items-center gap-1 font-semibold text-primary">
@@ -590,28 +682,30 @@ const AdminPanel = () => {
                                                                 )}
                                                             </td>
 
-                                                            {/* Estado de confirmación */}
                                                             <td className="px-3 py-2 align-middle">
-                                                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                                    titular.confirmed_at
-                                                                        ? 'bg-green-100 text-green-700'
-                                                                        : 'bg-gray-100 text-gray-500'
-                                                                }`}>
+                                                                <span
+                                                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                                        titular.confirmed_at
+                                                                            ? 'bg-green-100 text-green-700'
+                                                                            : 'bg-gray-100 text-gray-500'
+                                                                    }`}
+                                                                >
                                                                     {titular.confirmed_at ? 'Confirmó' : 'Pendiente'}
                                                                 </span>
                                                             </td>
 
-                                                            {/* Acciones: INTEGRIDAD ESTRICTA (Reiniciar Confirmación, NUNCA borrar titular aquí) */}
                                                             <td className="px-3 py-2 text-right whitespace-nowrap align-middle">
-                                                                {titular.confirmed_at ? (
+                                                                {titular.confirmed_at || hasAsistentes ? (
                                                                     <button
-                                                                        onClick={() => setDeleteItem({
-                                                                            type: 'reset_confirmacion',
-                                                                            id: titular.id,
-                                                                            name: `${titular.nombre} ${titular.apellido}`
-                                                                        })}
+                                                                        onClick={() =>
+                                                                            setDeleteItem({
+                                                                                type: 'reset_confirmacion',
+                                                                                id: titular.id,
+                                                                                name: `${titular.nombre} ${titular.apellido}`,
+                                                                            })
+                                                                        }
                                                                         className="inline-flex items-center gap-1 px-2 py-1 text-gray-500 hover:text-amber-700 hover:bg-amber-50 rounded transition-colors cursor-pointer text-[10px] font-semibold border border-gray-200"
-                                                                        title="Reiniciar datos de confirmación sin borrar el invitado"
+                                                                        title="Reiniciar confirmación sin borrar al invitado"
                                                                     >
                                                                         <RotateCcw size={12} />
                                                                         Reiniciar
@@ -622,33 +716,46 @@ const AdminPanel = () => {
                                                             </td>
                                                         </tr>
 
-                                                        {/* FILA ANIDADA (NESTED ROW) */}
+                                                        {/* FILA ANIDADA */}
                                                         {isExpanded && (
                                                             <tr className="bg-gray-50/70 border-b border-gray-100">
                                                                 <td colSpan={9} className="p-0">
                                                                     <div className="py-2.5 pl-11 pr-4 space-y-2">
-                                                                        <div className="flex items-center justify-between">
+                                                                        <div className="flex flex-wrap items-center justify-between gap-2">
                                                                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                                                                                Acompañantes y Asistencia ({asistentes.length} registrados)
+                                                                                Asistentes ({asistentes.length} / {totalPases})
                                                                             </span>
-                                                                            {/* Botón para agregar acompañante faltante */}
-                                                                            <button
-                                                                                onClick={() => setAddAsistenteTitular({
-                                                                                    ...titular,
-                                                                                    nombreNuevo: '',
-                                                                                    plato_fuerte: menu?.platosFuertes?.[0]?.nombre || '',
-                                                                                    contornos: []
-                                                                                })}
-                                                                                className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded text-[10px] font-bold transition-all cursor-pointer border border-primary/20"
-                                                                            >
-                                                                                <Plus size={12} />
-                                                                                + Agregar Acompañante
-                                                                            </button>
+
+                                                                            <div className="flex items-center gap-2">
+                                                                                {!hasTitularRow && !cupoLleno && (
+                                                                                    <button
+                                                                                        onClick={() => openCreateAsistente(titular, true)}
+                                                                                        className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-800 text-white hover:bg-gray-700 rounded text-[10px] font-bold transition-all cursor-pointer"
+                                                                                    >
+                                                                                        <UserCheck size={12} />
+                                                                                        Agregar Titular
+                                                                                    </button>
+                                                                                )}
+
+                                                                                <button
+                                                                                    onClick={() => openCreateAsistente(titular, false)}
+                                                                                    disabled={cupoLleno}
+                                                                                    title={cupoLleno ? `Cupo lleno (${totalPases}/${totalPases})` : 'Agregar acompañante'}
+                                                                                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold transition-all border ${
+                                                                                        cupoLleno
+                                                                                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                                                                            : 'bg-primary/10 text-primary hover:bg-primary hover:text-white border-primary/20 cursor-pointer'
+                                                                                    }`}
+                                                                                >
+                                                                                    <Plus size={12} />
+                                                                                    {cupoLleno ? 'Cupo lleno' : 'Agregar Acompañante'}
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
 
                                                                         {!hasAsistentes ? (
                                                                             <div className="py-2 text-[11px] text-gray-400 italic">
-                                                                                No ha confirmado asistentes todavía. Puedes agregar acompañantes manualmente con el botón de arriba.
+                                                                                No ha confirmado asistentes todavía.
                                                                             </div>
                                                                         ) : (
                                                                             <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
@@ -670,38 +777,45 @@ const AdminPanel = () => {
                                                                                                     {idx + 1}
                                                                                                 </td>
                                                                                                 <td className="py-1.5 px-3 font-semibold text-gray-800">
-                                                                                                    {asistente.nombre_completo}
+                                                                                                    {nombreCompletoDe(asistente)}
                                                                                                 </td>
                                                                                                 <td className="py-1.5 px-3">
-                                                                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                                                                                                        asistente.es_titular
-                                                                                                            ? 'bg-gray-800 text-white'
-                                                                                                            : 'bg-gray-100 text-gray-600'
-                                                                                                    }`}>
+                                                                                                    <span
+                                                                                                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                                                                                            asistente.es_titular
+                                                                                                                ? 'bg-gray-800 text-white'
+                                                                                                                : 'bg-gray-100 text-gray-600'
+                                                                                                        }`}
+                                                                                                    >
                                                                                                         {asistente.es_titular ? 'Titular' : `Acomp. de ${titular.nombre}`}
                                                                                                     </span>
                                                                                                 </td>
                                                                                                 <td className="py-1.5 px-3 text-gray-700">
-                                                                                                    {asistente.plato_fuerte || '—'}
+                                                                                                    {labelOf(platosList, asistente.plato_fuerte)}
                                                                                                 </td>
                                                                                                 <td className="py-1.5 px-3 text-gray-600">
-                                                                                                    {(asistente.contornos || []).join(', ') || '—'}
+                                                                                                    {(asistente.contornos || [])
+                                                                                                        .map((id) => labelOf(contornosList, id))
+                                                                                                        .join(', ') || '—'}
                                                                                                 </td>
                                                                                                 <td className="py-1.5 px-3 text-right whitespace-nowrap">
                                                                                                     <div className="inline-flex items-center gap-1">
                                                                                                         <button
-                                                                                                            onClick={() => setEditAsistenteItem(asistente)}
+                                                                                                            onClick={() => openEditAsistente(titular, asistente)}
                                                                                                             className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded cursor-pointer"
                                                                                                             title="Editar asistente"
                                                                                                         >
                                                                                                             <Edit2 size={13} />
                                                                                                         </button>
                                                                                                         <button
-                                                                                                            onClick={() => setDeleteItem({
-                                                                                                                type: 'confirmacion',
-                                                                                                                id: asistente.id,
-                                                                                                                name: asistente.nombre_completo
-                                                                                                            })}
+                                                                                                            onClick={() =>
+                                                                                                                setDeleteItem({
+                                                                                                                    type: 'confirmacion',
+                                                                                                                    id: asistente.id,
+                                                                                                                    invitadoId: titular.id,
+                                                                                                                    name: nombreCompletoDe(asistente),
+                                                                                                                })
+                                                                                                            }
                                                                                                             className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded cursor-pointer"
                                                                                                             title="Eliminar este asistente"
                                                                                                         >
@@ -725,7 +839,6 @@ const AdminPanel = () => {
                                         )}
                                     </tbody>
 
-                                    {/* FOOTER CON SUMATORIA TOTAL */}
                                     {titularesAgrupados.length > 0 && (
                                         <tfoot className="bg-gray-100/90 font-bold text-gray-800 border-t-2 border-gray-300">
                                             <tr>
@@ -734,7 +847,9 @@ const AdminPanel = () => {
                                                     {titularesAgrupados.length} Familias / Titulares
                                                 </td>
                                                 <td className="px-3 py-2.5">
-                                                    <span className="text-gray-500 font-normal">Filtro: {grupoFilter}</span>
+                                                    <span className="text-gray-500 font-normal">
+                                                        Filtro: {grupoFilter === 'todos' ? 'Todos' : grupoFilter === 'novia' ? nombreNovia : nombreNovio}
+                                                    </span>
                                                 </td>
                                                 <td className="px-3 py-2.5 text-gray-400 font-normal">—</td>
                                                 <td className="px-3 py-2.5 text-gray-900 font-bold">
@@ -756,11 +871,10 @@ const AdminPanel = () => {
                 )}
 
                 {/* ════════════════════════════════════════════════════════════
-                    TAB 2: GESTIÓN DE INVITADOS (CRUD + WHATSAPP CON PREVIEW)
+                    TAB 2: GESTIÓN DE INVITADOS
                 ════════════════════════════════════════════════════════════ */}
                 {tab === 'invitados' && (
                     <div className="space-y-3">
-                        {/* Barra de Filtros y Botón Nuevo Invitado */}
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-gray-200">
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Grupo:</span>
@@ -768,8 +882,8 @@ const AdminPanel = () => {
                                     {[
                                         { id: 'todos', label: 'Todos' },
                                         { id: 'novia', label: nombreNovia },
-                                        { id: 'novio', label: nombreNovio }
-                                    ].map(g => (
+                                        { id: 'novio', label: nombreNovio },
+                                    ].map((g) => (
                                         <button
                                             key={g.id}
                                             onClick={() => setGrupoFilter(g.id)}
@@ -786,19 +900,21 @@ const AdminPanel = () => {
                             </div>
 
                             <button
-                                onClick={() => setGuestModal({
-                                    isOpen: true,
-                                    mode: 'create',
-                                    data: {
-                                        nombre: '',
-                                        apellido: '',
-                                        telefono: '',
-                                        email: '',
-                                        grupo: 'novia',
-                                        slots_totales: 0,
-                                        puede_subir_fotos: true,
-                                    }
-                                })}
+                                onClick={() =>
+                                    setGuestModal({
+                                        isOpen: true,
+                                        mode: 'create',
+                                        data: {
+                                            nombre: '',
+                                            apellido: '',
+                                            telefono: '',
+                                            email: '',
+                                            grupo: 'novia',
+                                            slots_totales: 0,
+                                            puede_subir_fotos: true,
+                                        },
+                                    })
+                                }
                                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-primary hover:bg-secondary text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
                             >
                                 <Plus size={14} />
@@ -806,7 +922,6 @@ const AdminPanel = () => {
                             </button>
                         </div>
 
-                        {/* Tabla de Invitados */}
                         <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-xs border-collapse">
@@ -832,7 +947,7 @@ const AdminPanel = () => {
                                                 </td>
                                             </tr>
                                         ) : (
-                                            titularesAgrupados.map(({ titular }) => {
+                                            titularesAgrupados.map(({ titular, asistentes, fotosCount }) => {
                                                 const slotsCount = Number(titular.slots_totales ?? titular.slots ?? 0);
                                                 const totalPases = 1 + slotsCount;
                                                 const isCopied = copiedToken === titular.id;
@@ -844,11 +959,13 @@ const AdminPanel = () => {
                                                         </td>
 
                                                         <td className="px-3 py-2">
-                                                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                                                titular.grupo === 'novia'
-                                                                    ? 'bg-pink-100 text-pink-700'
-                                                                    : 'bg-blue-100 text-blue-700'
-                                                            }`}>
+                                                            <span
+                                                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                                    titular.grupo === 'novia'
+                                                                        ? 'bg-pink-100 text-pink-700'
+                                                                        : 'bg-blue-100 text-blue-700'
+                                                                }`}
+                                                            >
                                                                 {titular.grupo === 'novia' ? nombreNovia : nombreNovio}
                                                             </span>
                                                         </td>
@@ -863,9 +980,7 @@ const AdminPanel = () => {
 
                                                         <td className="px-3 py-2 font-medium">
                                                             <span className="font-bold text-gray-900">{totalPases} pases</span>{' '}
-                                                            <span className="text-[10px] text-gray-400">
-                                                                (1 + {slotsCount})
-                                                            </span>
+                                                            <span className="text-[10px] text-gray-400">(1 + {slotsCount})</span>
                                                         </td>
 
                                                         <td className="px-3 py-2">
@@ -874,7 +989,6 @@ const AdminPanel = () => {
                                                             </span>
                                                         </td>
 
-                                                        {/* Copiar Enlace con feedback */}
                                                         <td className="px-3 py-2 whitespace-nowrap">
                                                             <button
                                                                 onClick={() => copyInviteLink(titular.token, titular.id)}
@@ -883,7 +997,7 @@ const AdminPanel = () => {
                                                                         ? 'bg-green-50 border-green-300 text-green-700'
                                                                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                                                                 }`}
-                                                                title="Copiar enlace con token"
+                                                                title={`Copiar enlace (${publicBaseUrl}/?ref=...)`}
                                                             >
                                                                 {isCopied ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
                                                                 {isCopied ? '¡Copiado!' : 'Copiar enlace'}
@@ -891,19 +1005,19 @@ const AdminPanel = () => {
                                                         </td>
 
                                                         <td className="px-3 py-2">
-                                                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                                titular.confirmed_at
-                                                                    ? 'bg-green-100 text-green-700'
-                                                                    : 'bg-gray-100 text-gray-500'
-                                                                }`}>
+                                                            <span
+                                                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                                    titular.confirmed_at
+                                                                        ? 'bg-green-100 text-green-700'
+                                                                        : 'bg-gray-100 text-gray-500'
+                                                                }`}
+                                                            >
                                                                 {titular.confirmed_at ? 'Sí' : 'No'}
                                                             </span>
                                                         </td>
 
-                                                        {/* Acciones: WhatsApp, Editar, Borrar */}
                                                         <td className="px-3 py-2 text-right whitespace-nowrap">
                                                             <div className="inline-flex items-center gap-1">
-                                                                {/* Botón WhatsApp abre modal con preview */}
                                                                 <button
                                                                     onClick={() => openWhatsAppModal(titular)}
                                                                     className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer"
@@ -912,29 +1026,29 @@ const AdminPanel = () => {
                                                                     <MessageCircle size={15} />
                                                                 </button>
 
-                                                                {/* Editar datos del invitado */}
                                                                 <button
-                                                                    onClick={() => setGuestModal({
-                                                                        isOpen: true,
-                                                                        mode: 'edit',
-                                                                        data: {
-                                                                            ...titular,
-                                                                            slots_totales: slotsCount
-                                                                        }
-                                                                    })}
+                                                                    onClick={() =>
+                                                                        setGuestModal({
+                                                                            isOpen: true,
+                                                                            mode: 'edit',
+                                                                            data: { ...titular, slots_totales: slotsCount },
+                                                                        })
+                                                                    }
                                                                     className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded transition-colors cursor-pointer"
                                                                     title="Editar invitado"
                                                                 >
                                                                     <Edit2 size={14} />
                                                                 </button>
 
-                                                                {/* Eliminar invitado maestro de la lista */}
                                                                 <button
-                                                                    onClick={() => setDeleteItem({
-                                                                        type: 'titular',
-                                                                        id: titular.id,
-                                                                        name: `${titular.nombre} ${titular.apellido}`
-                                                                    })}
+                                                                    onClick={() =>
+                                                                        setDeleteItem({
+                                                                            type: 'titular',
+                                                                            id: titular.id,
+                                                                            name: `${titular.nombre} ${titular.apellido}`,
+                                                                            extraInfo: `Se borrarán también ${asistentes.length} confirmación(es) y ${fotosCount} foto(s) asociadas.`,
+                                                                        })
+                                                                    }
                                                                     className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
                                                                     title="Eliminar invitado de la base de datos"
                                                                 >
@@ -958,14 +1072,13 @@ const AdminPanel = () => {
                 ════════════════════════════════════════════════════════════ */}
                 {tab === 'fotos' && (
                     <div className="space-y-4">
-                        {/* Filtros de estado */}
-                        <div className="flex gap-1.5 bg-white p-2.5 rounded-xl border border-gray-200">
+                        <div className="flex flex-wrap gap-1.5 bg-white p-2.5 rounded-xl border border-gray-200">
                             {[
                                 { id: 'todas', label: 'Todas', count: fotos.length },
-                                { id: 'pendiente', label: 'Pendientes', count: fotos.filter(f => f.estado === 'pendiente').length },
-                                { id: 'aprobada', label: 'Aprobadas', count: fotos.filter(f => f.estado === 'aprobada').length },
-                                { id: 'rechazada', label: 'Rechazadas', count: fotos.filter(f => f.estado === 'rechazada').length },
-                            ].map(filter => (
+                                { id: 'pendiente', label: 'Pendientes', count: fotos.filter((f) => f.estado === 'pendiente').length },
+                                { id: 'aprobada', label: 'Aprobadas', count: fotos.filter((f) => f.estado === 'aprobada').length },
+                                { id: 'rechazada', label: 'Rechazadas', count: fotos.filter((f) => f.estado === 'rechazada').length },
+                            ].map((filter) => (
                                 <button
                                     key={filter.id}
                                     onClick={() => setFotoFilter(filter.id)}
@@ -990,10 +1103,15 @@ const AdminPanel = () => {
                                     <div key={f.id} className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-xs flex flex-col text-xs">
                                         <div className="aspect-square bg-gray-100 relative">
                                             <img src={f.url} alt="Foto subida" className="w-full h-full object-cover" />
-                                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                f.estado === 'aprobada' ? 'bg-green-600 text-white' :
-                                                f.estado === 'rechazada' ? 'bg-red-600 text-white' : 'bg-yellow-500 text-white'
-                                            }`}>
+                                            <span
+                                                className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                    f.estado === 'aprobada'
+                                                        ? 'bg-green-600 text-white'
+                                                        : f.estado === 'rechazada'
+                                                            ? 'bg-red-600 text-white'
+                                                            : 'bg-yellow-500 text-white'
+                                                }`}
+                                            >
                                                 {f.estado}
                                             </span>
                                         </div>
@@ -1024,315 +1142,115 @@ const AdminPanel = () => {
                 )}
 
                 {/* ════════════════════════════════════════════════════════════
-                    TAB 4: CONFIGURACIÓN DINÁMICA DEL EVENTO (SUPABASE)
+                    TAB 4: CONFIGURACIÓN DINÁMICA DEL EVENTO
                 ════════════════════════════════════════════════════════════ */}
-                {tab === 'configuracion' && (
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 max-w-4xl space-y-6">
-                        <div className="border-b border-gray-100 pb-3 flex justify-between items-center">
-                            <div>
-                                <h2 className="text-base font-bold text-gray-900">Configuración Global del Evento</h2>
-                                <p className="text-xs text-gray-500">
-                                    Todos los datos aquí editados se guardan en la tabla <code>configuracion</code> de Supabase y alimentan de inmediato la tarjeta y los formularios.
-                                </p>
-                            </div>
-                            <button
-                                onClick={reloadConfig}
-                                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5"
-                            >
-                                <RefreshCw size={13} /> Recargar
-                            </button>
-                        </div>
-
-                        {configSaveStatus.msg && (
-                            <div className={`p-3 rounded-lg text-xs font-bold ${
-                                configSaveStatus.error ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
-                            }`}>
-                                {configSaveStatus.msg}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSaveConfig} className="space-y-6">
-                            {/* Sección: Nombres de los Novios y Contacto */}
-                            <div className="space-y-3">
-                                <h3 className="text-xs font-bold text-primary uppercase tracking-wider">1. Datos de los Novios</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-3.5 rounded-xl border border-gray-200">
-                                    {/* Novia */}
-                                    <div className="space-y-2">
-                                        <span className="text-[11px] font-bold text-gray-600 uppercase">La Novia:</span>
-                                        <div>
-                                            <label className="block text-[10px] text-gray-500 uppercase">Nombre</label>
-                                            <input
-                                                type="text"
-                                                value={configForm?.novios?.novia?.nombre || ''}
-                                                onChange={(e) => setConfigForm({
-                                                    ...configForm,
-                                                    novios: {
-                                                        ...configForm.novios,
-                                                        novia: { ...configForm.novios?.novia, nombre: e.target.value }
-                                                    }
-                                                })}
-                                                className="w-full p-2 rounded-lg border border-gray-300 text-xs bg-white"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] text-gray-500 uppercase">WhatsApp (con código país)</label>
-                                            <input
-                                                type="text"
-                                                value={configForm?.novios?.novia?.whatsapp || ''}
-                                                onChange={(e) => setConfigForm({
-                                                    ...configForm,
-                                                    novios: {
-                                                        ...configForm.novios,
-                                                        novia: { ...configForm.novios?.novia, whatsapp: e.target.value }
-                                                    }
-                                                })}
-                                                className="w-full p-2 rounded-lg border border-gray-300 text-xs bg-white font-mono"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Novio */}
-                                    <div className="space-y-2">
-                                        <span className="text-[11px] font-bold text-gray-600 uppercase">El Novio:</span>
-                                        <div>
-                                            <label className="block text-[10px] text-gray-500 uppercase">Nombre</label>
-                                            <input
-                                                type="text"
-                                                value={configForm?.novios?.novio?.nombre || ''}
-                                                onChange={(e) => setConfigForm({
-                                                    ...configForm,
-                                                    novios: {
-                                                        ...configForm.novios,
-                                                        novio: { ...configForm.novios?.novio, nombre: e.target.value }
-                                                    }
-                                                })}
-                                                className="w-full p-2 rounded-lg border border-gray-300 text-xs bg-white"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] text-gray-500 uppercase">WhatsApp (con código país)</label>
-                                            <input
-                                                type="text"
-                                                value={configForm?.novios?.novio?.whatsapp || ''}
-                                                onChange={(e) => setConfigForm({
-                                                    ...configForm,
-                                                    novios: {
-                                                        ...configForm.novios,
-                                                        novio: { ...configForm.novios?.novio, whatsapp: e.target.value }
-                                                    }
-                                                })}
-                                                className="w-full p-2 rounded-lg border border-gray-300 text-xs bg-white font-mono"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Sección: Fechas del Evento */}
-                            <div className="space-y-3">
-                                <h3 className="text-xs font-bold text-primary uppercase tracking-wider">2. Fechas Clave</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-3.5 rounded-xl border border-gray-200">
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
-                                            Fecha de la Boda (ISO o YYYY-MM-DD):
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={configForm?.fecha || ''}
-                                            onChange={(e) => setConfigForm({ ...configForm, fecha: e.target.value })}
-                                            className="w-full p-2 rounded-lg border border-gray-300 text-xs bg-white font-mono"
-                                            placeholder="2026-12-19T17:00:00"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
-                                            Fecha Límite para RSVP / Confirmación Menú:
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={configForm?.fechaLimiteRsvp || ''}
-                                            onChange={(e) => setConfigForm({ ...configForm, fechaLimiteRsvp: e.target.value })}
-                                            className="w-full p-2 rounded-lg border border-gray-300 text-xs bg-white font-mono"
-                                            placeholder="2026-11-30"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Sección: Menú Gastronómico */}
-                            <div className="space-y-3">
-                                <h3 className="text-xs font-bold text-primary uppercase tracking-wider">3. Menú (Platos Fuertes y Contornos)</h3>
-                                <div className="space-y-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs">
-                                    {/* Platos Fuertes */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1.5">
-                                            Platos Fuertes Disponibles:
-                                        </label>
-                                        <div className="space-y-1.5">
-                                            {(configForm?.menu?.platosFuertes || []).map((plato, idx) => (
-                                                <div key={idx} className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={plato.nombre}
-                                                        onChange={(e) => {
-                                                            const newPlatos = [...configForm.menu.platosFuertes];
-                                                            newPlatos[idx] = { ...newPlatos[idx], nombre: e.target.value };
-                                                            setConfigForm({ ...configForm, menu: { ...configForm.menu, platosFuertes: newPlatos } });
-                                                        }}
-                                                        className="flex-1 p-1.5 rounded border border-gray-300 bg-white"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newPlatos = configForm.menu.platosFuertes.filter((_, i) => i !== idx);
-                                                            setConfigForm({ ...configForm, menu: { ...configForm.menu, platosFuertes: newPlatos } });
-                                                        }}
-                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                                                        title="Eliminar plato"
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const newId = `plato_${Date.now()}`;
-                                                    const newPlatos = [...(configForm?.menu?.platosFuertes || []), { id: newId, nombre: 'Nuevo Plato' }];
-                                                    setConfigForm({ ...configForm, menu: { ...configForm.menu, platosFuertes: newPlatos } });
-                                                }}
-                                                className="text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
-                                            >
-                                                + Añadir Plato Fuerte
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Contornos */}
-                                    <div className="pt-3 border-t border-gray-200">
-                                        <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1.5">
-                                            Contornos / Guarniciones Disponibles:
-                                        </label>
-                                        <div className="space-y-1.5">
-                                            {(configForm?.menu?.contornos || []).map((contorno, idx) => (
-                                                <div key={idx} className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={contorno.nombre}
-                                                        onChange={(e) => {
-                                                            const newContornos = [...configForm.menu.contornos];
-                                                            newContornos[idx] = { ...newContornos[idx], nombre: e.target.value };
-                                                            setConfigForm({ ...configForm, menu: { ...configForm.menu, contornos: newContornos } });
-                                                        }}
-                                                        className="flex-1 p-1.5 rounded border border-gray-300 bg-white"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newContornos = configForm.menu.contornos.filter((_, i) => i !== idx);
-                                                            setConfigForm({ ...configForm, menu: { ...configForm.menu, contornos: newContornos } });
-                                                        }}
-                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                                                        title="Eliminar contorno"
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const newId = `contorno_${Date.now()}`;
-                                                    const newContornos = [...(configForm?.menu?.contornos || []), { id: newId, nombre: 'Nuevo Contorno' }];
-                                                    setConfigForm({ ...configForm, menu: { ...configForm.menu, contornos: newContornos } });
-                                                }}
-                                                className="text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
-                                            >
-                                                + Añadir Contorno
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="pt-2">
-                                <button
-                                    type="submit"
-                                    disabled={configSaveStatus.loading}
-                                    className="px-6 py-2.5 bg-primary hover:bg-secondary text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
-                                >
-                                    <Save size={15} />
-                                    {configSaveStatus.loading ? 'Guardando en Supabase...' : 'Guardar Configuración en Supabase'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                )}
-
+                {tab === 'configuracion' && <ConfigTab confirmaciones={confirmaciones} />}
             </div>
 
             {/* ════════════════════════════════════════════════════════════
-                MODAL: AGREGAR ACOMPAÑANTE MANUAL A UN TITULAR
+                MODAL: CREAR / EDITAR ASISTENTE (NOMBRE, APELLIDO, PLATO Y CONTORNOS)
             ════════════════════════════════════════════════════════════ */}
-            {addAsistenteTitular && (
+            {asistenteModal && (
                 <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <div>
-                                <h3 className="text-base font-bold text-gray-900">Agregar Acompañante</h3>
+                                <h3 className="text-base font-bold text-gray-900">
+                                    {asistenteModal.mode === 'edit'
+                                        ? 'Editar Asistente'
+                                        : asistenteModal.es_titular
+                                            ? 'Agregar Confirmación del Titular'
+                                            : 'Agregar Acompañante'}
+                                </h3>
                                 <p className="text-xs text-gray-500">
-                                    Para el titular: <strong>{addAsistenteTitular.nombre} {addAsistenteTitular.apellido}</strong>
+                                    Titular: <strong>{asistenteModal.titular.nombre} {asistenteModal.titular.apellido}</strong>
                                 </p>
                             </div>
                             <button
-                                onClick={() => setAddAsistenteTitular(null)}
+                                onClick={() => setAsistenteModal(null)}
                                 className="p-1 text-gray-400 hover:text-gray-700 cursor-pointer"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleAddAsistenteManual} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">
-                                    Nombre y Apellido del Acompañante *
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="Ej: María Pérez"
-                                    value={addAsistenteTitular.nombreNuevo || ''}
-                                    onChange={(e) => setAddAsistenteTitular({
-                                        ...addAsistenteTitular,
-                                        nombreNuevo: e.target.value
-                                    })}
-                                    className="w-full p-2.5 rounded-lg border border-gray-300 text-sm focus:border-primary focus:outline-none"
-                                    required
-                                    autoFocus
-                                />
+                        <form onSubmit={handleSaveAsistente} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Nombre *</label>
+                                    <input
+                                        type="text"
+                                        value={asistenteModal.nombre}
+                                        onChange={(e) => setAsistenteModal({ ...asistenteModal, nombre: e.target.value })}
+                                        placeholder="Ej: María"
+                                        className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Apellido *</label>
+                                    <input
+                                        type="text"
+                                        value={asistenteModal.apellido}
+                                        onChange={(e) => setAsistenteModal({ ...asistenteModal, apellido: e.target.value })}
+                                        placeholder="Ej: Pérez"
+                                        className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none"
+                                        required
+                                    />
+                                </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Plato Fuerte</label>
+                                <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Plato Fuerte *</label>
                                 <select
-                                    value={addAsistenteTitular.plato_fuerte || ''}
-                                    onChange={(e) => setAddAsistenteTitular({
-                                        ...addAsistenteTitular,
-                                        plato_fuerte: e.target.value
-                                    })}
-                                    className="w-full p-2.5 rounded-lg border border-gray-300 text-sm focus:border-primary focus:outline-none"
+                                    value={asistenteModal.plato_fuerte || ''}
+                                    onChange={(e) => setAsistenteModal({ ...asistenteModal, plato_fuerte: e.target.value })}
+                                    className="w-full p-2.5 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none bg-white"
+                                    required
                                 >
-                                    {(menu?.platosFuertes || []).map(p => (
-                                        <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                                    <option value="">Selecciona un plato</option>
+                                    {platosList.map((p) => (
+                                        <option key={p.id} value={p.id}>{p.nombre}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            <div className="flex gap-2 pt-3">
+                            {maxContornos > 0 && contornosList.length > 0 && (
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+                                        Contornos * ({asistenteModal.contornos.length}/{maxContornos})
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {contornosList.map((c) => {
+                                            const selected = asistenteModal.contornos.includes(c.id);
+                                            const disabled = !selected && asistenteModal.contornos.length >= maxContornos;
+                                            return (
+                                                <button
+                                                    key={c.id}
+                                                    type="button"
+                                                    onClick={() => toggleModalContorno(c.id)}
+                                                    disabled={disabled}
+                                                    className={`p-2 rounded-lg border text-xs font-medium text-left flex items-center justify-between transition-all ${
+                                                        selected
+                                                            ? 'border-primary bg-primary/10 text-gray-900 cursor-pointer'
+                                                            : disabled
+                                                                ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                                                                : 'border-gray-200 hover:border-primary/50 text-gray-700 cursor-pointer'
+                                                    }`}
+                                                >
+                                                    <span>{c.nombre}</span>
+                                                    {selected && <Check size={13} className="text-primary shrink-0" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex gap-2 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setAddAsistenteTitular(null)}
+                                    onClick={() => setAsistenteModal(null)}
                                     className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
                                 >
                                     Cancelar
@@ -1342,7 +1260,11 @@ const AdminPanel = () => {
                                     disabled={actionLoading}
                                     className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-secondary transition-colors cursor-pointer"
                                 >
-                                    {actionLoading ? 'Guardando...' : 'Agregar Acompañante'}
+                                    {actionLoading
+                                        ? 'Guardando...'
+                                        : asistenteModal.mode === 'edit'
+                                            ? 'Guardar Cambios'
+                                            : 'Guardar Asistente'}
                                 </button>
                             </div>
                         </form>
@@ -1446,10 +1368,9 @@ const AdminPanel = () => {
                                     <input
                                         type="text"
                                         value={guestModal.data?.nombre || ''}
-                                        onChange={(e) => setGuestModal({
-                                            ...guestModal,
-                                            data: { ...guestModal.data, nombre: e.target.value }
-                                        })}
+                                        onChange={(e) =>
+                                            setGuestModal({ ...guestModal, data: { ...guestModal.data, nombre: e.target.value } })
+                                        }
                                         className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none"
                                         required
                                     />
@@ -1459,10 +1380,9 @@ const AdminPanel = () => {
                                     <input
                                         type="text"
                                         value={guestModal.data?.apellido || ''}
-                                        onChange={(e) => setGuestModal({
-                                            ...guestModal,
-                                            data: { ...guestModal.data, apellido: e.target.value }
-                                        })}
+                                        onChange={(e) =>
+                                            setGuestModal({ ...guestModal, data: { ...guestModal.data, apellido: e.target.value } })
+                                        }
                                         className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none"
                                         required
                                     />
@@ -1476,10 +1396,9 @@ const AdminPanel = () => {
                                         type="text"
                                         value={guestModal.data?.telefono || ''}
                                         placeholder="+58414..."
-                                        onChange={(e) => setGuestModal({
-                                            ...guestModal,
-                                            data: { ...guestModal.data, telefono: e.target.value }
-                                        })}
+                                        onChange={(e) =>
+                                            setGuestModal({ ...guestModal, data: { ...guestModal.data, telefono: e.target.value } })
+                                        }
                                         className="w-full p-2 rounded-lg border border-gray-300 text-xs font-mono focus:border-primary focus:outline-none"
                                         required
                                     />
@@ -1488,11 +1407,10 @@ const AdminPanel = () => {
                                     <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Grupo *</label>
                                     <select
                                         value={guestModal.data?.grupo || 'novia'}
-                                        onChange={(e) => setGuestModal({
-                                            ...guestModal,
-                                            data: { ...guestModal.data, grupo: e.target.value }
-                                        })}
-                                        className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none"
+                                        onChange={(e) =>
+                                            setGuestModal({ ...guestModal, data: { ...guestModal.data, grupo: e.target.value } })
+                                        }
+                                        className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none bg-white"
                                         required
                                     >
                                         <option value="novia">{nombreNovia} (Novia)</option>
@@ -1506,10 +1424,9 @@ const AdminPanel = () => {
                                 <input
                                     type="email"
                                     value={guestModal.data?.email || ''}
-                                    onChange={(e) => setGuestModal({
-                                        ...guestModal,
-                                        data: { ...guestModal.data, email: e.target.value }
-                                    })}
+                                    onChange={(e) =>
+                                        setGuestModal({ ...guestModal, data: { ...guestModal.data, email: e.target.value } })
+                                    }
                                     className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none"
                                 />
                             </div>
@@ -1523,21 +1440,22 @@ const AdminPanel = () => {
                                         <input
                                             type="number"
                                             min="0"
-                                            max="10"
+                                            max="20"
                                             value={guestModal.data?.slots_totales ?? guestModal.data?.slots ?? 0}
-                                            onChange={(e) => setGuestModal({
-                                                ...guestModal,
-                                                data: {
-                                                    ...guestModal.data,
-                                                    slots_totales: parseInt(e.target.value) || 0,
-                                                    slots: parseInt(e.target.value) || 0
-                                                }
-                                            })}
+                                            onChange={(e) => {
+                                                const v = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                                setGuestModal({
+                                                    ...guestModal,
+                                                    data: { ...guestModal.data, slots_totales: v, slots: v },
+                                                });
+                                            }}
                                             className="w-24 p-2 rounded-lg border border-gray-300 text-xs font-bold focus:border-primary focus:outline-none"
                                             required
                                         />
                                         <span className="text-xs text-gray-600">
-                                            = Total: <strong>{1 + (Number(guestModal.data?.slots_totales ?? guestModal.data?.slots) || 0)} personas</strong> (Titular + {guestModal.data?.slots_totales ?? guestModal.data?.slots ?? 0})
+                                            = Total:{' '}
+                                            <strong>{1 + (Number(guestModal.data?.slots_totales ?? guestModal.data?.slots) || 0)} personas</strong>{' '}
+                                            (Titular + {guestModal.data?.slots_totales ?? guestModal.data?.slots ?? 0})
                                         </span>
                                     </div>
                                 </div>
@@ -1547,10 +1465,12 @@ const AdminPanel = () => {
                                         <input
                                             type="checkbox"
                                             checked={guestModal.data?.puede_subir_fotos ?? true}
-                                            onChange={(e) => setGuestModal({
-                                                ...guestModal,
-                                                data: { ...guestModal.data, puede_subir_fotos: e.target.checked }
-                                            })}
+                                            onChange={(e) =>
+                                                setGuestModal({
+                                                    ...guestModal,
+                                                    data: { ...guestModal.data, puede_subir_fotos: e.target.checked },
+                                                })
+                                            }
                                             className="rounded text-primary focus:ring-primary"
                                         />
                                         <span>Permitirle subir fotos a la galería</span>
@@ -1580,74 +1500,18 @@ const AdminPanel = () => {
             )}
 
             {/* ════════════════════════════════════════════════════════════
-                MODAL: EDITAR ASISTENTE
-            ════════════════════════════════════════════════════════════ */}
-            {editAsistenteItem && (
-                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-base font-bold">Editar Asistente</h3>
-                            <button onClick={() => setEditAsistenteItem(null)} className="p-1 text-gray-400 hover:text-gray-700 cursor-pointer">
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSaveAsistenteEdit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Nombre Completo *</label>
-                                <input
-                                    type="text"
-                                    value={editAsistenteItem.nombre_completo}
-                                    onChange={(e) => setEditAsistenteItem({ ...editAsistenteItem, nombre_completo: e.target.value })}
-                                    className="w-full p-2.5 rounded-lg border border-gray-300 text-sm focus:border-primary focus:outline-none"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Plato Fuerte</label>
-                                <select
-                                    value={editAsistenteItem.plato_fuerte || ''}
-                                    onChange={(e) => setEditAsistenteItem({ ...editAsistenteItem, plato_fuerte: e.target.value })}
-                                    className="w-full p-2.5 rounded-lg border border-gray-300 text-sm focus:border-primary focus:outline-none"
-                                >
-                                    <option value="">Selecciona plato</option>
-                                    {(menu?.platosFuertes || []).map(p => (
-                                        <option key={p.id} value={p.nombre}>{p.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="flex gap-2 pt-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setEditAsistenteItem(null)}
-                                    className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={actionLoading}
-                                    className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-secondary transition-colors cursor-pointer"
-                                >
-                                    {actionLoading ? 'Guardando...' : 'Guardar Cambios'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ════════════════════════════════════════════════════════════
                 MODAL: CONFIRMAR ACCIONES DESTRUCTIVAS O REINICIO
             ════════════════════════════════════════════════════════════ */}
             {deleteItem && (
                 <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                            deleteItem.type === 'reset_confirmacion' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
-                        }`}>
+                        <div
+                            className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                                deleteItem.type === 'reset_confirmacion'
+                                    ? 'bg-amber-100 text-amber-600'
+                                    : 'bg-red-100 text-red-600'
+                            }`}
+                        >
                             {deleteItem.type === 'reset_confirmacion' ? <RotateCcw size={24} /> : <AlertTriangle size={24} />}
                         </div>
 
@@ -1655,7 +1519,7 @@ const AdminPanel = () => {
                             {deleteItem.type === 'reset_confirmacion' ? '¿Reiniciar confirmación?' : '¿Estás seguro de eliminar?'}
                         </h3>
 
-                        <p className="text-xs text-gray-500 mb-4">
+                        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
                             {deleteItem.type === 'reset_confirmacion' ? (
                                 <>
                                     Se borrarán las respuestas de asistencia y menú de <strong>{deleteItem.name}</strong> y sus acompañantes.
@@ -1664,13 +1528,21 @@ const AdminPanel = () => {
                                 </>
                             ) : deleteItem.type === 'titular' ? (
                                 <>
-                                    Estás a punto de borrar al invitado <strong>{deleteItem.name}</strong> definitivamente de la base de datos de invitados.
+                                    Estás a punto de borrar al invitado <strong>{deleteItem.name}</strong> definitivamente de la base de datos.
+                                    {deleteItem.extraInfo && (
+                                        <>
+                                            <br />
+                                            <span className="text-gray-700 font-medium">{deleteItem.extraInfo}</span>
+                                        </>
+                                    )}
                                     <br />
                                     <span className="text-red-500 font-semibold">Esta acción no tiene vuelta atrás.</span>
                                 </>
                             ) : (
                                 <>
-                                    Estás a punto de eliminar a <strong>{deleteItem.name}</strong> de los acompañantes confirmados.
+                                    Estás a punto de eliminar a <strong>{deleteItem.name}</strong> de los asistentes confirmados.
+                                    <br />
+                                    <span className="text-red-500 font-semibold">Esta acción no tiene vuelta atrás.</span>
                                 </>
                             )}
                         </p>
@@ -1691,13 +1563,16 @@ const AdminPanel = () => {
                                         : 'bg-red-600 hover:bg-red-700'
                                 }`}
                             >
-                                {actionLoading ? 'Procesando...' : deleteItem.type === 'reset_confirmacion' ? 'Sí, reiniciar' : 'Sí, eliminar'}
+                                {actionLoading
+                                    ? 'Procesando...'
+                                    : deleteItem.type === 'reset_confirmacion'
+                                        ? 'Sí, reiniciar'
+                                        : 'Sí, eliminar'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-
         </div>
     );
 };

@@ -13,8 +13,13 @@ export const evento = {
         titulo: 'Emma & Simón — 31 de Enero 2026',
         descripcion: 'Estamos muy emocionados de compartir este día contigo.',
         ogImage: '/og-image-green.png',
-        url: 'https://mi-invitacion.vercel.app',
+        url: 'https://emmaysimon.netlify.app',
     },
+
+    // URL pública usada para generar los enlaces de invitación en WhatsApp
+    urlPublica: 'https://emmaysimon.netlify.app',
+    plantillaWhatsapp:
+        '¡Hola {nombre}! Estamos muy felices de compartir nuestro día contigo. Esta invitación es válida para {personas}. Confírmanos tu asistencia y menú antes del {fecha_limite}. Nos vemos pronto. Con amor, {novios} ✨\n\n{enlace}',
 
     // ─── Novios ───────────────────────────────
     novios: {
@@ -26,7 +31,7 @@ export const evento = {
         novio: {
             nombre: 'Simón',
             apellido: 'España',
-            whatsapp: '+584148527145',
+            whatsapp: '+584140110568',
         },
     },
 

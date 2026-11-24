@@ -12,9 +12,24 @@ import Gallery from './components/Gallery';
 import QuoteSection from './components/QuoteSection';
 import Acknowledgements from './components/Acknowledgements';
 import AdminPanel from './components/AdminPanel';
+import AdminLogin from './components/AdminLogin';
+import { supabase } from './lib/supabase';
 
-function InvitacionContent({ initialInvitado, autoPlayMusic }) {
+function InvitacionContent({ initialInvitado }) {
     const [invitado, setInvitado] = useState(initialInvitado);
+    const [entered, setEntered] = useState(false);
+    const [autoPlayMusic, setAutoPlayMusic] = useState(true);
+
+    if (!entered) {
+        return (
+            <WelcomeOverlay
+                onEnter={({ soundEnabled }) => {
+                    setAutoPlayMusic(soundEnabled);
+                    setEntered(true);
+                }}
+            />
+        );
+    }
 
     return (
         <div className="min-h-screen bg-background font-body text-gray-800 selection:bg-primary selection:text-white">
@@ -35,43 +50,64 @@ function InvitacionContent({ initialInvitado, autoPlayMusic }) {
     );
 }
 
+function AdminGate() {
+    const [session, setSession] = useState(undefined); // undefined = cargando
+
+    useEffect(() => {
+        let mounted = true;
+        supabase.auth.getSession().then(({ data }) => {
+            if (mounted) setSession(data?.session ?? null);
+        });
+
+        const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+            if (mounted) setSession(nextSession ?? null);
+        });
+
+        return () => {
+            mounted = false;
+            listener?.subscription?.unsubscribe();
+        };
+    }, []);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setSession(null);
+    };
+
+    if (session === undefined) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (!session) {
+        return <AdminLogin onLoginSuccess={(s) => setSession(s)} />;
+    }
+
+    return <AdminPanel user={session.user} onLogout={handleLogout} />;
+}
+
 function App() {
-    const [entered, setEntered] = useState(false);
-    const [autoPlayMusic, setAutoPlayMusic] = useState(true);
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.has('admin');
+    });
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('admin')) {
-            setIsAdmin(true);
-        }
+        setIsAdmin(params.has('admin'));
     }, []);
 
     if (isAdmin) {
-        return <AdminPanel />;
+        return <AdminGate />;
     }
 
     return (
-        <>
-            {!entered && (
-                <WelcomeOverlay
-                    onEnter={({ soundEnabled }) => {
-                        setAutoPlayMusic(soundEnabled);
-                        setEntered(true);
-                    }}
-                />
-            )}
-            {entered && (
-                <AccessGate>
-                    {(invitado) => (
-                        <InvitacionContent
-                            initialInvitado={invitado}
-                            autoPlayMusic={autoPlayMusic}
-                        />
-                    )}
-                </AccessGate>
-            )}
-        </>
+        <AccessGate>
+            {(invitado) => <InvitacionContent initialInvitado={invitado} />}
+        </AccessGate>
     );
 }
 

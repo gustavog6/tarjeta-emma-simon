@@ -1,10 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import ManoElegante from '../assets/emmasimonmanoelegante.png';
 
 const QuoteSection = () => {
-    const { texto, firma } = evento.textos.quote;
+    const { config } = useConfig();
+    const { texto, firma } = config.textos.quote;
 
     return (
         <section className="py-16 px-6 bg-background relative overflow-hidden flex items-center justify-center">

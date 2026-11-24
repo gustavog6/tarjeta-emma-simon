@@ -1,17 +1,18 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 
 const ParentsSection = () => {
-    const { padres, padrinos } = evento;
+    const { config } = useConfig();
+    const { padres, padrinos } = config;
 
-    const tienePadres = padres.novia.padre || padres.novia.madre || padres.novio.padre || padres.novio.madre;
+    const tienePadres = padres?.novia?.padre || padres?.novia?.madre || padres?.novio?.padre || padres?.novio?.madre;
     const tienePadrinos = padrinos && padrinos.length > 0;
 
     if (!tienePadres && !tienePadrinos) return null;
 
-    const { novia, novio } = evento.novios;
+    const { novia, novio } = config.novios;
 
     return (
         <section className="py-20 px-4 bg-background relative overflow-hidden">

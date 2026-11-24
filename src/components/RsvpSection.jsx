@@ -4,14 +4,15 @@ import { MessageCircle, Gift, CheckCircle2 } from 'lucide-react';
 import DressCode from './DressCode';
 import RsvpModal from './RsvpModal';
 import GiftModal from './GiftModal';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 
 const RsvpSection = ({ invitado, onUpdateInvitado }) => {
     const [isRsvpModalOpen, setIsRsvpModalOpen] = useState(false);
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
 
+    const { config } = useConfig();
     const isConfirmed = Boolean(invitado?.confirmed_at);
-    const { textos } = evento;
+    const { textos } = config;
 
     return (
         <section className="py-20 px-4 bg-background">

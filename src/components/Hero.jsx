@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import goldSilhouette from '../assets/corazon-verde-solo-2.png';
 
 const Hero = () => {
-    const { novia, novio } = evento.novios;
-    const { badge } = evento.textos.hero;
+    const { config } = useConfig();
+    const { novia, novio } = config.novios;
+    const { badge } = config.textos.hero;
 
     return (
         <section className="relative h-screen w-full overflow-hidden flex items-start justify-center">

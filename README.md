@@ -1,59 +1,60 @@
 # Invitación Digital para Bodas (v2) 💍
 
-Plantilla moderna, interactiva y genérica para invitaciones de boda y eventos, construida con **React 19**, **Vite**, **Tailwind CSS**, **Framer Motion** y **Supabase**.
+Plantilla moderna, interactiva y configurable para invitaciones de boda y eventos, construida con **React 19**, **Vite**, **Tailwind CSS**, **Framer Motion** y **Supabase**.
 
 ---
 
 ## ✨ Características
 
-- 🔒 **Acceso por enlace personalizado (`?ref=UUID`):** Privacidad garantizada. Solo quienes tengan su enlace pueden acceder.
-- 💌 **Overlay de bienvenida:** Entrada interactiva con botón para abrir la invitación.
-- 🎵 **Ambientación musical sin autoplay molesto:** Botón flotante siempre visible para reproducir/pausar a elección del usuario.
-- 📅 **Save The Date + Cuenta regresiva en vivo:** Integrado en una sola sección con botón de **descarga de evento a calendario (`.ics`)**.
-- 📍 **Ubicaciones y mapas:** Tarjetas interactivas con modales de Google Maps embebidos y enlaces directos a Google Maps.
-- ⏳ **Itinerario:** Línea de tiempo visual y estilizada con iconos representativos.
-- 🍽️ **RSVP Inteligente (Confirmación de asistencia):**
-  - Identificación automática de invitado y grupo (Novia / Novio).
-  - Límite de acompañantes según cupos asignados (`slots`).
-  - Selección de plato fuerte y contornos para cada invitado.
-  - Guarda en base de datos **Supabase** y genera mensaje directo a **WhatsApp**.
-  - Reconoce si el invitado ya confirmó (`confirmed_at`) mostrando su estado en lugar de volver a pedir datos.
-- 🎁 **Mesa de regalos:** Soporte para Pago Móvil, transferencias y Binance Pay con botón de copiado rápido al portapapeles.
-- 📸 **Galería compartida:** Los invitados pueden subir fotos de la boda comprimidas en el navegador antes de enviarse. Las fotos pasan por moderación.
-- 🛡️ **Panel de administración:** Accesible mediante `?admin=true` para aprobar/rechazar fotos y auditar confirmaciones.
-- ⚙️ **Configuración centralizada:** Toda la información del evento vive en un solo archivo: `src/config/evento.js`.
+- 🔒 **Acceso por enlace personalizado (`?ref=UUID`):** Privacidad garantizada mediante RPC segura. Sin token válido no se muestra la invitación.
+- 💌 **Overlay de bienvenida con control de música:** Música activada por defecto con botón claro para silenciar antes de entrar, más reproductor flotante.
+- 📅 **Save The Date + Cuenta regresiva en vivo:** Descarga de evento a calendario (`.ics`) y generador de **banner 9:16 para historias**.
+- 📍 **Ubicaciones y mapas:** Tarjetas interactivas con modales de Google Maps embebidos y enlaces directos.
+- ⏳ **Itinerario:** Línea de tiempo visual con íconos configurables desde el panel.
+- 🍽️ **RSVP Inteligente y Atómico:**
+  - Límite de acompañantes por invitado (`1 + slots_totales`) validado tanto en UI como en base de datos.
+  - Nombre, apellido y menú completo (plato fuerte + contornos) por cada asistente.
+  - Confirmación atómica mediante función RPC en Supabase + envío por WhatsApp.
+- 🎁 **Mesa de regalos:** Pago Móvil y Binance Pay con copiado rápido al portapapeles.
+- 📸 **Galería compartida:** Subida de fotos comprimidas en el cliente, moderación manual y visor ampliado con descarga.
+- 🛡️ **Panel de administración protegido con Supabase Auth (`?admin=true`):**
+  - Confirmaciones en tabla con filas anidadas, agregar acompañantes/titular, reiniciar confirmación sin borrar al invitado, exportación a **Excel (.xlsx)** y **PDF (.pdf)**.
+  - Gestión completa de invitados y envío de invitaciones por WhatsApp con vista previa editable.
+  - Moderación de fotos y pestaña de **Configuración Global** guardada en Supabase.
 
 ---
 
 ## 🚀 Inicio Rápido
 
-### 1. Clonar e instalar dependencias
+### 1. Instalar dependencias
 
-
-### 2. Variables de entorno
 ```bash
 git checkout invitacion-v2
 npm install
 ```
 
-Copia el archivo de ejemplo:
+### 2. Variables de entorno
 
 ```bash
 cp .env.example .env
 ```
 
-Configura tus credenciales de Supabase en `.env`:
+Configura tus credenciales desde **Supabase Dashboard → Settings → API Keys**:
 
 ```env
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-VITE_SUPABASE_ANON_KEY=tu-anon-key
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_tu_clave_aqui
 ```
 
-### 3. Base de datos (Supabase)
+### 3. Base de datos y seguridad (Supabase)
 
-1. En tu proyecto de Supabase, entra a **SQL Editor**.
-2. Ejecuta el script `supabase/001_initial.sql` (crea tablas `invitados`, `confirmaciones`, `fotos` y sus políticas RLS).
-3. Ejecuta el script `supabase/002_storage.sql` (crea el bucket `galeria` y sus permisos).
+Ejecuta en **SQL Editor** en orden estricto:
+1. `supabase/001_initial.sql`
+2. `supabase/002_storage.sql`
+3. `supabase/003_configuracion.sql`
+4. `supabase/004_integridad.sql`
+
+Luego crea la cuenta de los novios en **Authentication → Users** y desactiva el registro público (*Allow new users to sign up*). Consulta [supabase/SETUP.md](supabase/SETUP.md) para los pasos detallados.
 
 ### 4. Ejecutar en desarrollo
 
@@ -63,49 +64,6 @@ npm run dev
 
 ---
 
-## 🔗 Cómo invitar personas
-
-Inserta los invitados en la tabla `invitados` de Supabase (o mediante script/dashboard).
-El campo `token` se genera automáticamente como UUID.
-
-El enlace para cada invitado tendrá este formato:
-
-```
-https://tu-dominio.com/?ref=UUID-DEL-INVITADO
-```
-
-- Si entras **sin token**: verás una pantalla elegante indicando que la invitación requiere enlace personal.
-- Si entras **con token**: se carga el nombre del invitado y su límite de acompañantes.
-- Si entras con `?admin=true`: verás el panel de moderación de fotos y lista de confirmados.
-
----
-
 ## 🎨 Personalización del Evento
 
-Para usar esta plantilla para otra boda o evento, solo modifica:
-
-```
-src/config/evento.js
-```
-
-Ahí puedes cambiar:
-- Nombres de los novios y teléfonos de WhatsApp
-- Fecha y hora del evento
-- Ubicaciones y enlaces a mapas
-- Itinerario
-- Código de vestimenta
-- Opciones de menú (platos fuertes y contornos)
-- Cuentas bancarias para regalos
-- Citas, textos emotivos y versículos
-
----
-
-## 🛠️ Tecnologías
-
-- **React 19**
-- **Vite 5**
-- **Tailwind CSS 3**
-- **Framer Motion 12**
-- **Supabase JS Client**
-- **browser-image-compression**
-- **Lucide React**
+La configuración por defecto vive en `src/config/evento.js` (respaldo offline), y en producción se administra en vivo desde la pestaña **Configuración** del panel (`?admin=true`), guardándose en la tabla `configuracion` de Supabase.

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Gift, Copy, Check } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 
 const GiftModal = ({ isOpen, onClose }) => {
+    const { config } = useConfig();
     const [copiedIndex, setCopiedIndex] = useState(null);
 
     if (!isOpen) return null;
@@ -14,7 +15,7 @@ const GiftModal = ({ isOpen, onClose }) => {
         setTimeout(() => setCopiedIndex(null), 2000);
     };
 
-    const { datosBancarios, textos } = evento;
+    const { datosBancarios, textos } = config;
     const { titulo, subtitulo } = textos.regalos;
 
     return (

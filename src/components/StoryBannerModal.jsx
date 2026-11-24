@@ -1,17 +1,19 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Share2, Sparkles } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
+import { parseFecha } from '../utils/fechas';
 
 const StoryBannerModal = ({ isOpen, onClose }) => {
+    const { config } = useConfig();
     const canvasRef = useRef(null);
     const [downloading, setDownloading] = useState(false);
 
     if (!isOpen) return null;
 
-    const { novios, fecha, venues } = evento;
+    const { novios, fecha, venues } = config;
     const venue = venues[0] || {};
-    const dateObj = new Date(fecha);
+    const dateObj = parseFecha(fecha) || new Date();
     const dateFormatted = dateObj.toLocaleDateString('es-ES', {
         day: 'numeric',
         month: 'long',

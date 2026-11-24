@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useInvitado } from '../hooks/useInvitado';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 
 /**
  * AccessGate
@@ -18,6 +18,7 @@ import { evento } from '../config/evento';
  *   </AccessGate>
  */
 export default function AccessGate({ children }) {
+    const { config } = useConfig();
     const { invitado, loading, error } = useInvitado();
 
     // ── Cargando ──────────────────────────────
@@ -48,7 +49,7 @@ export default function AccessGate({ children }) {
                     transition={{ duration: 0.8 }}
                 >
                     <p className="font-heading text-5xl text-primary mb-4">
-                        {evento.novios.novio.nombre} &amp; {evento.novios.novia.nombre}
+                        {config.novios.novio.nombre} &amp; {config.novios.novia.nombre}
                     </p>
                     <div className="h-px w-16 bg-primary/30 mx-auto mb-6" />
                     <p className="text-gray-400 text-sm leading-relaxed">

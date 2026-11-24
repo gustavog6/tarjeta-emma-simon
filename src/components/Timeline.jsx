@@ -1,19 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import {
-    MapPin, Church, Wine, Utensils, Music,
-    Camera, Cake, Users, Star, Heart
-} from 'lucide-react';
-import { evento } from '../config/evento';
-
-// Mapa de string → componente Lucide
-const ICON_MAP = {
-    MapPin,  Church, Wine, Utensils, Music,
-    Camera,  Cake,   Users, Star,    Heart,
-};
+import { MapPin } from 'lucide-react';
+import { useConfig } from '../context/ConfigContext';
+import { ICON_MAP } from '../utils/iconRegistry';
 
 const Timeline = () => {
-    const { itinerario, textos } = evento;
+    const { config } = useConfig();
+    const { itinerario, textos } = config;
     const { titulo } = textos.itinerario;
 
     return (

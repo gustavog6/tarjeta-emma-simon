@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS invitados (
     email         TEXT,
     telefono      TEXT,
     grupo         TEXT NOT NULL CHECK (grupo IN ('novia', 'novio')),
-    slots         INT  NOT NULL DEFAULT 1,          -- personas que puede registrar (incluido él)
+    slots         INT  NOT NULL DEFAULT 0,          -- acompañantes adicionales permitidos (+N; renombrado a slots_totales en 003)
     puede_subir_fotos BOOLEAN NOT NULL DEFAULT TRUE,
     confirmed_at  TIMESTAMPTZ,                      -- NULL = no confirmado
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()

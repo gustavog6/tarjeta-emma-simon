@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Image as ImageIcon, ZoomIn } from 'lucide-react';
-import { evento } from '../config/evento';
+import { useConfig } from '../context/ConfigContext';
 import { supabase } from '../lib/supabase';
 import PhotoUploadModal from './PhotoUploadModal';
 import PhotoViewerModal from './PhotoViewerModal';
 
 const Gallery = ({ invitado }) => {
+    const { config } = useConfig();
     const [photos, setPhotos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -17,13 +18,24 @@ const Gallery = ({ invitado }) => {
     const loadPhotos = async () => {
         try {
             if (!supabase) return;
-            const { data, error } = await supabase
-                .from('fotos')
-                .select('*, invitados(nombre, apellido)')
-                .eq('estado', 'aprobada')
-                .order('created_at', { ascending: false });
+            let data = null;
+            const { data: rpcData, error: rpcError } = await supabase.rpc('galeria_publica');
 
-            if (error) throw error;
+            if (rpcError) {
+                if (rpcError.code === 'PGRST202' || rpcError.code === '42883') {
+                    const { data: fbData, error: fbError } = await supabase
+                        .from('fotos')
+                        .select('*, invitados(nombre, apellido)')
+                        .eq('estado', 'aprobada')
+                        .order('created_at', { ascending: false });
+                    if (fbError) throw fbError;
+                    data = fbData;
+                } else {
+                    throw rpcError;
+                }
+            } else {
+                data = rpcData;
+            }
 
             if (data && data.length > 0) {
                 const photoUrls = data.map((item) => {
@@ -47,7 +59,7 @@ const Gallery = ({ invitado }) => {
         loadPhotos();
     }, []);
 
-    if (!evento.galeria?.habilitada) return null;
+    if (!config.galeria?.habilitada) return null;
 
     return (
         <section className="py-20 px-4 bg-secondary/5 relative overflow-hidden">

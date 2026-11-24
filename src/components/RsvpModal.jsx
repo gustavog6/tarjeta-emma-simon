@@ -2,48 +2,57 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, UtensilsCrossed, Check, ChevronRight, ChevronLeft,
-    MessageCircle, Users, User, Plus, Trash2, Heart
+    MessageCircle, Users, Plus, Trash2, Heart, AlertCircle
 } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import { supabase } from '../lib/supabase';
+import { parseFecha } from '../utils/fechas';
+import { friendlyError } from '../utils/errores';
 import vestido from '../assets/vestido-verde.png';
 import camisa from '../assets/camisa-verde.png';
 
-const createEmptyGuest = (nombre = '', esTitular = false) => ({
+const createEmptyGuest = (nombre = '', apellido = '', esTitular = false) => ({
     nombre,
+    apellido,
     esTitular,
     platoFuerte: null,
     contornos: [],
     regalo: null,
 });
 
+const fullNameOf = (g) => `${g.nombre || ''} ${g.apellido || ''}`.trim();
+
 const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
     const { config } = useConfig();
-    const { novios, menu, regalos = [], fecha, textos } = config;
-    // slots_totales = acompañantes adicionales permitidos. Total = 1 (titular) + slots_totales
+    const { novios, menu, fecha, textos } = config;
     const rawSlots = invitado?.slots_totales ?? invitado?.slots ?? 0;
     const maxSlots = 1 + (Number(rawSlots) || 0);
     const defaultGrupo = invitado?.grupo || null;
-    const titularName = invitado ? `${invitado.nombre} ${invitado.apellido}`.trim() : '';
+
+    const initialTitular = () =>
+        createEmptyGuest(invitado?.nombre || '', invitado?.apellido || '', true);
 
     const [step, setStep] = useState(1);
     const [invitadoDe, setInvitadoDe] = useState(defaultGrupo);
-    const [guests, setGuests] = useState([createEmptyGuest(titularName, true)]);
+    const [guests, setGuests] = useState([initialTitular()]);
     const [currentGuestIndex, setCurrentGuestIndex] = useState(0);
     const [menuStep, setMenuStep] = useState('platoFuerte');
     const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState(null);
 
     if (!isOpen) return null;
 
     const currentGuest = guests[currentGuestIndex];
+    const maxContornos = menu?.maxContornos ?? 2;
 
     const resetSelections = () => {
         setStep(1);
-        setGuests([createEmptyGuest(titularName, true)]);
+        setGuests([initialTitular()]);
         setCurrentGuestIndex(0);
         setMenuStep('platoFuerte');
         setInvitadoDe(defaultGrupo);
         setSubmitting(false);
+        setSubmitError(null);
     };
 
     const handleClose = () => {
@@ -58,7 +67,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
     };
 
     const removeGuest = (index) => {
-        if (guests.length > 1) {
+        if (guests.length > 1 && index > 0) {
             const newGuests = guests.filter((_, i) => i !== index);
             setGuests(newGuests);
             if (currentGuestIndex >= newGuests.length) {
@@ -67,9 +76,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
         }
     };
 
-    const updateGuestName = (index, nombre) => {
+    const updateGuestField = (index, field, value) => {
         const newGuests = [...guests];
-        newGuests[index] = { ...newGuests[index], nombre };
+        newGuests[index] = { ...newGuests[index], [field]: value };
         setGuests(newGuests);
     };
 
@@ -81,22 +90,22 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
 
     const toggleContorno = (contorno) => {
         const currentContornos = currentGuest.contornos;
-        if (currentContornos.find(c => c.id === contorno.id)) {
-            updateCurrentGuest({ contornos: currentContornos.filter(c => c.id !== contorno.id) });
-        } else if (currentContornos.length < (menu.maxContornos || 2)) {
+        if (currentContornos.find((c) => c.id === contorno.id)) {
+            updateCurrentGuest({ contornos: currentContornos.filter((c) => c.id !== contorno.id) });
+        } else if (currentContornos.length < maxContornos) {
             updateCurrentGuest({ contornos: [...currentContornos, contorno] });
         }
     };
 
-    const allGuestsHaveNames = () => {
-        return guests.every(g => g.nombre.trim());
-    };
+    const allGuestsHaveNames = () =>
+        guests.every((g) => g.nombre.trim().length > 0 && g.apellido.trim().length > 0);
 
     const goToNextGuest = () => {
         if (currentGuestIndex < guests.length - 1) {
             setCurrentGuestIndex(currentGuestIndex + 1);
             setMenuStep('platoFuerte');
         } else {
+            setSubmitError(null);
             setStep(4);
         }
     };
@@ -116,12 +125,12 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
         const phone = invitadoDe === 'novia' ? novia.whatsapp : novio.whatsapp;
 
         let mensaje = `¡Hola! Confirmo asistencia a la boda de ${novio.nombre} & ${novia.nombre} 💍\n\n`;
-        mensaje += `*Invitados de:* ${invitadoDe === 'novia' ? novia.nombre + ' (Novia)' : novio.nombre + ' (Novio)'}\n`;
+        mensaje += `*Invitados de:* ${invitadoDe === 'novia' ? `${novia.nombre} (Novia)` : `${novio.nombre} (Novio)`}\n`;
         mensaje += `*Total de personas:* ${guests.length}\n\n`;
 
         guests.forEach((guest, index) => {
-            const contornos = guest.contornos.map(c => c.nombre).join(' y ');
-            mensaje += `*Invitado ${index + 1}:* ${guest.nombre}\n`;
+            const contornos = guest.contornos.map((c) => c.nombre).join(' y ');
+            mensaje += `*Invitado ${index + 1}:* ${fullNameOf(guest)}\n`;
             if (guest.platoFuerte) {
                 mensaje += `• Plato fuerte: ${guest.platoFuerte.nombre}\n`;
             }
@@ -134,61 +143,69 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
             mensaje += `\n`;
         });
 
-        const dateStr = new Date(fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-        mensaje += `¡Nos vemos el ${dateStr}!`;
+        const parsedDate = parseFecha(fecha);
+        const dateStr = parsedDate
+            ? parsedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+            : '';
+        if (dateStr) {
+            mensaje += `¡Nos vemos el ${dateStr}!`;
+        }
 
         const encoded = encodeURIComponent(mensaje);
-        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
         return `https://wa.me/${cleanPhone}?text=${encoded}`;
     };
 
     const handleConfirm = async () => {
+        if (submitting) return;
         setSubmitting(true);
+        setSubmitError(null);
 
         try {
-            // Guardar en Supabase si está disponible y existe invitado.id
-            if (supabase && invitado?.id) {
-                const inserts = guests.map((g, idx) => ({
-                    invitado_id: invitado.id,
-                    nombre_completo: g.nombre,
-                    es_titular: idx === 0,
-                    plato_fuerte: g.platoFuerte?.id || null,
-                    contornos: g.contornos.map(c => c.id),
-                    regalo_id: g.regalo || null,
-                }));
-
-                await supabase.from('confirmaciones').insert(inserts);
-
-                const nowIso = new Date().toISOString();
-                await supabase
-                    .from('invitados')
-                    .update({ confirmed_at: nowIso })
-                    .eq('id', invitado.id);
-
-                if (onConfirmed) {
-                    onConfirmed({ ...invitado, confirmed_at: nowIso });
-                }
+            if (!supabase || !invitado?.token) {
+                throw new Error('No se encontró el token de tu invitación.');
             }
+
+            const payload = guests.map((g) => ({
+                nombre: g.nombre.trim(),
+                apellido: g.apellido.trim(),
+                plato_fuerte: g.platoFuerte?.id || null,
+                contornos: g.contornos.map((c) => c.id),
+                regalo_id: g.regalo || null,
+            }));
+
+            const { data, error } = await supabase.rpc('confirmar_asistencia', {
+                p_token: invitado.token,
+                p_asistentes: payload,
+            });
+
+            if (error) throw error;
+
+            if (onConfirmed) {
+                onConfirmed(data || { ...invitado, confirmed_at: new Date().toISOString() });
+            }
+
+            // Solo abrimos WhatsApp si la confirmación se guardó con éxito en BD
+            const link = generateWhatsAppLink();
+            window.location.href = link;
+
+            setTimeout(() => {
+                setSubmitting(false);
+                handleClose();
+            }, 800);
         } catch (err) {
-            console.error('[RsvpModal] Error saving to Supabase:', err);
-        }
-
-        // Abrir WhatsApp con la confirmación
-        const link = generateWhatsAppLink();
-        window.location.href = link;
-
-        setTimeout(() => {
+            console.error('[RsvpModal] Error saving confirmation:', err);
+            setSubmitError(friendlyError(err));
             setSubmitting(false);
-            handleClose();
-        }, 1000);
+        }
     };
 
     const getStepLabel = () => {
         if (step === 1) return 'Paso 1/4: ¿De parte de quién vienes?';
         if (step === 2) return `Paso 2/4: ¿Quiénes asisten? (Máx ${maxSlots})`;
         if (step === 3) {
-            if (menuStep === 'platoFuerte') return `${currentGuest.nombre}: Plato fuerte`;
-            if (menuStep === 'contornos') return `${currentGuest.nombre}: Contornos`;
+            if (menuStep === 'platoFuerte') return `${fullNameOf(currentGuest)}: Plato fuerte`;
+            if (menuStep === 'contornos') return `${fullNameOf(currentGuest)}: Contornos`;
         }
         if (step === 4) return 'Paso 4/4: Confirmar asistencia';
         return '';
@@ -216,7 +233,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                         <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
                         <button
                             onClick={handleClose}
-                            className="absolute top-4 right-4 p-2 hover:bg-black/5 rounded-full transition-colors"
+                            className="absolute top-4 right-4 p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer"
                         >
                             <X className="w-5 h-5 text-gray-500" />
                         </button>
@@ -224,7 +241,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                         <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm text-primary">
                             <UtensilsCrossed size={32} />
                         </div>
-                        <h3 className="font-heading text-4xl text-primary">{textos.rsvp.titulo}</h3>
+                        <h3 className="font-heading text-4xl text-primary">{textos?.rsvp?.titulo || 'Confirmar Asistencia'}</h3>
                         <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">
                             {getStepLabel()}
                         </p>
@@ -313,7 +330,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                             </motion.div>
                         )}
 
-                        {/* Step 2: Nombres de invitados */}
+                        {/* Step 2: Nombres y Apellidos de invitados */}
                         {step === 2 && (
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
@@ -337,26 +354,53 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                             key={index}
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200"
+                                            className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2"
                                         >
-                                            <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary flex-shrink-0 font-bold text-sm">
-                                                {index + 1}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center text-primary flex-shrink-0 font-bold text-xs">
+                                                        {index + 1}
+                                                    </div>
+                                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                                        {index === 0 ? 'Titular' : `Acompañante ${index}`}
+                                                    </span>
+                                                </div>
+                                                {guests.length > 1 && index > 0 && (
+                                                    <button
+                                                        onClick={() => removeGuest(index)}
+                                                        className="p-1.5 text-red-400 hover:text-red-600 rounded-full transition-colors cursor-pointer"
+                                                        title="Quitar acompañante"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
-                                            <input
-                                                type="text"
-                                                value={guest.nombre}
-                                                onChange={(e) => updateGuestName(index, e.target.value)}
-                                                placeholder={index === 0 ? 'Nombre y Apellido (Titular)' : `Nombre del acompañante ${index}`}
-                                                className="flex-1 px-2 py-1 bg-transparent border-0 border-b border-gray-300 focus:border-primary focus:outline-none transition-all text-gray-700"
-                                            />
-                                            {guests.length > 1 && index > 0 && (
-                                                <button
-                                                    onClick={() => removeGuest(index)}
-                                                    className="p-2 text-red-400 hover:text-red-600 rounded-full transition-colors flex-shrink-0 cursor-pointer"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            )}
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={guest.nombre}
+                                                    onChange={(e) => updateGuestField(index, 'nombre', e.target.value)}
+                                                    readOnly={index === 0 && Boolean(invitado?.nombre)}
+                                                    placeholder="Nombre *"
+                                                    className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
+                                                        index === 0 && invitado?.nombre
+                                                            ? 'bg-gray-100 border-gray-200 text-gray-600'
+                                                            : 'bg-white border-gray-300 text-gray-700'
+                                                    }`}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={guest.apellido}
+                                                    onChange={(e) => updateGuestField(index, 'apellido', e.target.value)}
+                                                    readOnly={index === 0 && Boolean(invitado?.apellido)}
+                                                    placeholder="Apellido *"
+                                                    className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
+                                                        index === 0 && invitado?.apellido
+                                                            ? 'bg-gray-100 border-gray-200 text-gray-600'
+                                                            : 'bg-white border-gray-300 text-gray-700'
+                                                    }`}
+                                                />
+                                            </div>
                                         </motion.div>
                                     ))}
                                 </div>
@@ -419,7 +463,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                                     ? 'bg-primary text-white scale-110 shadow-sm'
                                                     : 'bg-gray-200 text-gray-500'
                                             }`}
-                                            title={guest.nombre}
+                                            title={fullNameOf(guest)}
                                         >
                                             {index + 1}
                                         </div>
@@ -429,11 +473,11 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                 {menuStep === 'platoFuerte' && (
                                     <>
                                         <h4 className="font-semibold text-gray-700 text-2xl text-center">
-                                            Plato fuerte para <span className="text-primary font-heading text-3xl">{currentGuest.nombre}</span>
+                                            Plato fuerte para <span className="text-primary font-heading text-3xl">{fullNameOf(currentGuest)}</span>
                                         </h4>
 
                                         <div className="space-y-2 pt-2">
-                                            {menu.platosFuertes.map((plato) => (
+                                            {(menu?.platosFuertes || []).map((plato) => (
                                                 <motion.button
                                                     key={plato.id}
                                                     onClick={() => updateCurrentGuest({ platoFuerte: plato })}
@@ -482,16 +526,16 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                 {menuStep === 'contornos' && (
                                     <>
                                         <h4 className="font-semibold text-gray-700 text-2xl text-center">
-                                            Contornos para <span className="text-primary font-heading text-3xl">{currentGuest.nombre}</span>
+                                            Contornos para <span className="text-primary font-heading text-3xl">{fullNameOf(currentGuest)}</span>
                                         </h4>
                                         <p className="text-xs text-gray-500 text-center mb-4">
-                                            {currentGuest.contornos.length}/{menu.maxContornos || 2} seleccionados
+                                            {currentGuest.contornos.length}/{maxContornos} seleccionados
                                         </p>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            {menu.contornos.map((contorno) => {
-                                                const isSelected = currentGuest.contornos.find(c => c.id === contorno.id);
-                                                const isDisabled = currentGuest.contornos.length >= (menu.maxContornos || 2) && !isSelected;
+                                            {(menu?.contornos || []).map((contorno) => {
+                                                const isSelected = currentGuest.contornos.find((c) => c.id === contorno.id);
+                                                const isDisabled = currentGuest.contornos.length >= maxContornos && !isSelected;
 
                                                 return (
                                                     <motion.button
@@ -527,9 +571,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                             </button>
                                             <button
                                                 onClick={goToNextGuest}
-                                                disabled={currentGuest.contornos.length !== (menu.maxContornos || 2)}
+                                                disabled={currentGuest.contornos.length !== maxContornos}
                                                 className={`flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                                    currentGuest.contornos.length === (menu.maxContornos || 2)
+                                                    currentGuest.contornos.length === maxContornos
                                                         ? 'bg-primary text-white hover:bg-secondary shadow-md'
                                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                                 }`}
@@ -563,6 +607,13 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                     </p>
                                 </div>
 
+                                {submitError && (
+                                    <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
+                                        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                        <span>{submitError}</span>
+                                    </div>
+                                )}
+
                                 <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
                                     {guests.map((g, idx) => (
                                         <div key={idx} className="bg-primary/5 p-3.5 rounded-xl border border-primary/20 text-sm">
@@ -570,11 +621,11 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                                 <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs">
                                                     {idx + 1}
                                                 </span>
-                                                {g.nombre}
+                                                {fullNameOf(g)}
                                             </div>
                                             <div className="text-gray-600 pl-7 text-xs space-y-0.5">
                                                 <p>• <strong>Plato:</strong> {g.platoFuerte?.nombre}</p>
-                                                <p>• <strong>Contornos:</strong> {g.contornos.map(c => c.nombre).join(', ')}</p>
+                                                <p>• <strong>Contornos:</strong> {g.contornos.map((c) => c.nombre).join(', ')}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -587,6 +638,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                             setCurrentGuestIndex(guests.length - 1);
                                             setMenuStep('contornos');
                                         }}
+                                        disabled={submitting}
                                         className="flex-1 py-3.5 rounded-full font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
                                     >
                                         <ChevronLeft size={18} />
@@ -595,7 +647,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                     <button
                                         onClick={handleConfirm}
                                         disabled={submitting}
-                                        className="flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 shadow-lg cursor-pointer transition-all"
+                                        className="flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 shadow-lg cursor-pointer transition-all disabled:opacity-60"
                                     >
                                         <MessageCircle size={18} />
                                         {submitting ? 'Confirmando...' : 'Confirmar'}

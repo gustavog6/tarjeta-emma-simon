@@ -45,7 +45,10 @@ const PhotoViewerModal = ({ isOpen, onClose, photo }) => {
                     <div className="p-4 px-6 bg-background/95 flex justify-between items-center border-b border-gray-100">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                             <User size={16} className="text-primary" />
-                            <span>{photo.invitados ? `${photo.invitados.nombre} ${photo.invitados.apellido}` : 'Recuerdo de la boda'}</span>
+                            <span>
+                                {photo.autor ||
+                                    (photo.invitados ? `${photo.invitados.nombre} ${photo.invitados.apellido}` : 'Recuerdo de la boda')}
+                            </span>
                         </div>
                         <button
                             onClick={onClose}
