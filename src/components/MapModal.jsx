@@ -17,21 +17,21 @@ const MapModal = ({ isOpen, onClose, locationUrl, title, externalLink }) => {
                     onClick={onClose}
                 />
 
-                {/* Modal */}
+                {/* Modal - Levemente más alto en versión web (h-[85vh] y min-h-[500px]) */}
                 <motion.div
-                    className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]"
+                    className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden relative z-10 flex flex-col h-[85vh] max-h-[90vh]"
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}
                 >
                     <div className="p-4 flex justify-between items-center bg-secondary/20 border-b border-primary/10 shrink-0">
                         <h3 className="font-heading text-2xl text-primary">{title}</h3>
-                        <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+                        <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer">
                             <X className="w-6 h-6 text-gray-600" />
                         </button>
                     </div>
 
-                    <div className="flex-1 w-full relative min-h-[300px]">
+                    <div className="flex-1 w-full relative min-h-[420px] md:min-h-[520px]">
                         <iframe
                             src={locationUrl}
                             className="absolute inset-0 w-full h-full"
@@ -48,7 +48,7 @@ const MapModal = ({ isOpen, onClose, locationUrl, title, externalLink }) => {
                                 href={externalLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-primary font-bold hover:underline"
+                                className="flex items-center gap-2 text-primary font-bold hover:underline text-sm"
                             >
                                 <MapPin size={18} />
                                 Abrir en Google Maps
