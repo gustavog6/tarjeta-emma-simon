@@ -12,6 +12,8 @@ const MENSAJES = {
     contorno_invalido: 'Uno de los contornos elegidos ya no está disponible en el menú.',
     demasiados_contornos: 'Se eligieron más contornos de los permitidos.',
     galeria_llena: 'La galería alcanzó el límite máximo de fotos para este evento.',
+    limite_maximo: 'Se alcanzó el número máximo de elementos permitidos para mantener el diseño.',
+    limite_minimo: 'No puedes dejar esta sección por debajo del mínimo obligatorio.',
     no_autorizado: 'No tienes permiso para esta acción. Inicia sesión de nuevo.',
 };
 
@@ -20,7 +22,9 @@ export function friendlyError(err) {
     for (const key of Object.keys(MENSAJES)) {
         if (msg.includes(key)) return MENSAJES[key];
     }
+    if (err?.code === '23503') return 'No puedes eliminar este registro porque todavía está siendo utilizado (por ejemplo, un grupo con invitados asignados).';
     if (err?.code === '23505') return 'Ya existe un registro duplicado (por ejemplo, un titular repetido).';
+    if (err?.code === '23514') return 'Uno de los textos excede la longitud máxima permitida o incumple una regla de validación.';
     if (err?.code === '42501') return 'Sin permisos: inicia sesión de nuevo.';
     return msg || 'Ocurrió un error inesperado.';
 }

@@ -18,6 +18,7 @@ Ve a **SQL Editor** en el dashboard de Supabase y ejecuta **en orden estricto**:
 5. `supabase/005_grupos_dinamicos.sql` (grupos de invitados 100% dinámicos en `configuracion`)
 6. `supabase/006_confirmacion_parcial.sql` (confirmaciones parciales hasta agotar pases)
 7. `supabase/007_limites_integridad.sql` (límites de longitud y cantidad para integridad visual mobile-first)
+8. `supabase/008_normalizacion_relacional.sql` (normalización 100% relacional sin JSONB: 7 tablas independientes + FK real en `invitados.grupo`)
 
 ## 3. Crear usuario administrador (los novios) y cerrar el registro público
 
