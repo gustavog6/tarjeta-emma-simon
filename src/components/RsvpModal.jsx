@@ -8,6 +8,7 @@ import { useConfig } from '../context/ConfigContext';
 import { supabase } from '../lib/supabase';
 import { parseFecha } from '../utils/fechas';
 import { friendlyError } from '../utils/errores';
+import { findGrupo, grupoLabel, grupoColorStyle } from '../utils/grupos';
 import vestido from '../assets/vestido-verde.png';
 import camisa from '../assets/camisa-verde.png';
 
@@ -24,7 +25,7 @@ const fullNameOf = (g) => `${g.nombre || ''} ${g.apellido || ''}`.trim();
 
 const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
     const { config } = useConfig();
-    const { novios, menu, fecha, textos } = config;
+    const { novios, menu, fecha, textos, grupos = [] } = config;
     const rawSlots = invitado?.slots_totales ?? invitado?.slots ?? 0;
     const maxSlots = 1 + (Number(rawSlots) || 0);
     const defaultGrupo = invitado?.grupo || null;
@@ -122,10 +123,16 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
     const generateWhatsAppLink = () => {
         const novia = novios.novia;
         const novio = novios.novio;
-        const phone = invitadoDe === 'novia' ? novia.whatsapp : novio.whatsapp;
+        const grupoObj = findGrupo(grupos, invitadoDe);
+        const phone =
+            grupoObj?.whatsapp ||
+            (invitadoDe === 'novia' ? novia.whatsapp : novio.whatsapp) ||
+            novia.whatsapp ||
+            novio.whatsapp ||
+            '';
 
         let mensaje = `¡Hola! Confirmo asistencia a la boda de ${novio.nombre} & ${novia.nombre} 💍\n\n`;
-        mensaje += `*Invitados de:* ${invitadoDe === 'novia' ? `${novia.nombre} (Novia)` : `${novio.nombre} (Novio)`}\n`;
+        mensaje += `*Grupo:* ${grupoLabel(grupos, invitadoDe)}\n`;
         mensaje += `*Total de personas:* ${guests.length}\n\n`;
 
         guests.forEach((guest, index) => {
@@ -275,44 +282,37 @@ const RsvpModal = ({ isOpen, onClose, invitado, onConfirmed }) => {
                                     <p className="text-sm text-gray-400 mt-1">Selecciona una opción</p>
                                 </div>
 
-                                <div className="flex gap-4">
-                                    <motion.button
-                                        onClick={() => setInvitadoDe('novia')}
-                                        className={`flex-1 p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 cursor-pointer ${
-                                            invitadoDe === 'novia'
-                                                ? 'border-pink-400 bg-pink-50 shadow-md'
-                                                : 'border-gray-200 hover:border-pink-300 hover:bg-pink-50/50'
-                                        }`}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                    >
-                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                                            invitadoDe === 'novia' ? 'bg-pink-200 text-white' : 'bg-pink-100 text-pink-400'
-                                        }`}>
-                                            <img src={vestido} alt="Novia" className="w-10 h-10 object-contain" />
-                                        </div>
-                                        <span className="font-bold text-xl text-gray-700">{novios.novia.nombre}</span>
-                                        <span className="text-xs text-gray-500 uppercase tracking-widest">La Novia</span>
-                                    </motion.button>
-
-                                    <motion.button
-                                        onClick={() => setInvitadoDe('novio')}
-                                        className={`flex-1 p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 cursor-pointer ${
-                                            invitadoDe === 'novio'
-                                                ? 'border-blue-400 bg-blue-50 shadow-md'
-                                                : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
-                                        }`}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                    >
-                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                                            invitadoDe === 'novio' ? 'bg-blue-200 text-white' : 'bg-blue-100 text-blue-400'
-                                        }`}>
-                                            <img src={camisa} alt="Novio" className="w-10 h-10 object-contain" />
-                                        </div>
-                                        <span className="font-bold text-xl text-gray-700">{novios.novio.nombre}</span>
-                                        <span className="text-xs text-gray-500 uppercase tracking-widest">El Novio</span>
-                                    </motion.button>
+                                <div className={`grid gap-3 ${grupos.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                                    {grupos.map((g) => {
+                                        const active = invitadoDe === g.id;
+                                        const style = grupoColorStyle(g.color);
+                                        return (
+                                            <motion.button
+                                                key={g.id}
+                                                onClick={() => setInvitadoDe(g.id)}
+                                                className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-2.5 cursor-pointer text-center ${
+                                                    active ? style.cardActive : style.cardIdle
+                                                }`}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                            >
+                                                <div
+                                                    className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                                                        active ? style.circleActive : style.circleIdle
+                                                    }`}
+                                                >
+                                                    {g.id === 'novia' ? (
+                                                        <img src={vestido} alt={g.nombre} className="w-9 h-9 object-contain" />
+                                                    ) : g.id === 'novio' ? (
+                                                        <img src={camisa} alt={g.nombre} className="w-9 h-9 object-contain" />
+                                                    ) : (
+                                                        <Users size={26} />
+                                                    )}
+                                                </div>
+                                                <span className="font-bold text-base text-gray-700 leading-tight">{g.nombre}</span>
+                                            </motion.button>
+                                        );
+                                    })}
                                 </div>
 
                                 <button

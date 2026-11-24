@@ -10,6 +10,7 @@ import { exportConfirmacionesToPDF } from '../utils/exportPdf';
 import { useConfig } from '../context/ConfigContext';
 import { formatFechaLarga } from '../utils/fechas';
 import { labelOf, canonicalId, nombreApellidoDe, nombreCompletoDe } from '../utils/menu';
+import { grupoLabel, grupoBadgeClass } from '../utils/grupos';
 import { friendlyError } from '../utils/errores';
 import ConfigTab from './ConfigTab';
 
@@ -39,10 +40,11 @@ const AdminPanel = ({ user, onLogout }) => {
     const [actionLoading, setActionLoading] = useState(false);
     const [copiedToken, setCopiedToken] = useState(null);
 
-    const { novios, fechaLimiteRsvp, menu, urlPublica, plantillaWhatsapp } = config;
+    const { novios, fechaLimiteRsvp, menu, urlPublica, plantillaWhatsapp, grupos = [] } = config;
     const nombreNovia = novios?.novia?.nombre || 'Novia';
     const nombreNovio = novios?.novio?.nombre || 'Novio';
     const nombresNovios = `${nombreNovio} & ${nombreNovia}`;
+    const defaultGrupoId = grupos[0]?.id || 'novia';
     const platosList = menu?.platosFuertes || [];
     const contornosList = menu?.contornos || [];
     const maxContornos = menu?.maxContornos ?? 2;
@@ -404,7 +406,7 @@ const AdminPanel = ({ user, onLogout }) => {
     };
 
     // ─── Agrupación y Cálculos de Totales ──────────────────────────
-    const titularesAgrupados = invitados
+    const todosAgrupados = invitados
         .map((titular) => {
             const asistentes = confirmaciones.filter((c) => c.invitado_id === titular.id);
             const fotosSubidas = fotos.filter((f) => f.invitado_id === titular.id);
@@ -419,16 +421,21 @@ const AdminPanel = ({ user, onLogout }) => {
             return grupo.titular.grupo === grupoFilter;
         });
 
+    // Tab Confirmaciones: SOLO quienes ya confirmaron (o tienen asistentes registrados)
+    const confirmadosAgrupados = todosAgrupados.filter(
+        ({ titular, asistentes }) => Boolean(titular.confirmed_at) || asistentes.length > 0
+    );
+
     const fotosFiltradas = fotos.filter((f) => {
         if (fotoFilter === 'todas') return true;
         return f.estado === fotoFilter;
     });
 
-    const totalPasesPotenciales = titularesAgrupados.reduce((acc, g) => {
+    const totalPasesConfirmados = confirmadosAgrupados.reduce((acc, g) => {
         const s = Number(g.titular.slots_totales ?? g.titular.slots ?? 0);
         return acc + 1 + s;
     }, 0);
-    const totalAsistentesConfirmados = titularesAgrupados.reduce((acc, g) => acc + g.asistentes.length, 0);
+    const totalAsistentesConfirmados = confirmadosAgrupados.reduce((acc, g) => acc + g.asistentes.length, 0);
 
     return (
         <div className="min-h-screen bg-gray-50 p-3 md:p-6 font-body text-gray-800">
@@ -535,11 +542,10 @@ const AdminPanel = ({ user, onLogout }) => {
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-gray-200">
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Grupo:</span>
-                                <div className="flex gap-1">
+                                <div className="flex flex-wrap gap-1">
                                     {[
-                                        { id: 'todos', label: 'Todos' },
-                                        { id: 'novia', label: nombreNovia },
-                                        { id: 'novio', label: nombreNovio },
+                                        { id: 'todos', nombre: 'Todos' },
+                                        ...grupos,
                                     ].map((g) => (
                                         <button
                                             key={g.id}
@@ -550,7 +556,7 @@ const AdminPanel = ({ user, onLogout }) => {
                                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                             }`}
                                         >
-                                            {g.label}
+                                            {g.nombre}
                                         </button>
                                     ))}
                                 </div>
@@ -570,15 +576,17 @@ const AdminPanel = ({ user, onLogout }) => {
                                     Colapsar
                                 </button>
                                 <button
-                                    onClick={() => exportConfirmacionesToXLSX(titularesAgrupados, config)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-700 hover:bg-green-800 text-white rounded text-xs font-bold transition-colors cursor-pointer"
+                                    onClick={() => exportConfirmacionesToXLSX(confirmadosAgrupados, config)}
+                                    disabled={confirmadosAgrupados.length === 0}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white rounded text-xs font-bold transition-colors cursor-pointer"
                                 >
                                     <Download size={13} />
                                     Excel (.xlsx)
                                 </button>
                                 <button
-                                    onClick={() => exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilter)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-800 hover:bg-gray-900 text-white rounded text-xs font-bold transition-colors cursor-pointer"
+                                    onClick={() => exportConfirmacionesToPDF(confirmadosAgrupados, config, grupoFilter)}
+                                    disabled={confirmadosAgrupados.length === 0}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white rounded text-xs font-bold transition-colors cursor-pointer"
                                 >
                                     <FileText size={13} />
                                     PDF (.pdf)
@@ -604,14 +612,14 @@ const AdminPanel = ({ user, onLogout }) => {
                                     </thead>
 
                                     <tbody className="divide-y divide-gray-100">
-                                        {titularesAgrupados.length === 0 ? (
+                                        {confirmadosAgrupados.length === 0 ? (
                                             <tr>
                                                 <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
-                                                    No se encontraron registros bajo este filtro.
+                                                    Aún no hay confirmaciones registradas bajo este filtro.
                                                 </td>
                                             </tr>
                                         ) : (
-                                            titularesAgrupados.map(({ titular, asistentes, fotosCount }) => {
+                                            confirmadosAgrupados.map(({ titular, asistentes, fotosCount }) => {
                                                 const isExpanded = Boolean(expandedRows[titular.id]);
                                                 const hasAsistentes = asistentes.length > 0;
                                                 const hasTitularRow = asistentes.some((a) => a.es_titular);
@@ -637,13 +645,9 @@ const AdminPanel = ({ user, onLogout }) => {
 
                                                             <td className="px-3 py-2 align-middle">
                                                                 <span
-                                                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                                                        titular.grupo === 'novia'
-                                                                            ? 'bg-pink-100 text-pink-700'
-                                                                            : 'bg-blue-100 text-blue-700'
-                                                                    }`}
+                                                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${grupoBadgeClass(grupos, titular.grupo)}`}
                                                                 >
-                                                                    {titular.grupo === 'novia' ? nombreNovia : nombreNovio}
+                                                                    {grupoLabel(grupos, titular.grupo)}
                                                                 </span>
                                                             </td>
 
@@ -839,24 +843,24 @@ const AdminPanel = ({ user, onLogout }) => {
                                         )}
                                     </tbody>
 
-                                    {titularesAgrupados.length > 0 && (
+                                    {confirmadosAgrupados.length > 0 && (
                                         <tfoot className="bg-gray-100/90 font-bold text-gray-800 border-t-2 border-gray-300">
                                             <tr>
                                                 <td className="px-3 py-2.5 text-center">∑</td>
                                                 <td className="px-3 py-2.5 font-bold">
-                                                    {titularesAgrupados.length} Familias / Titulares
+                                                    {confirmadosAgrupados.length} Familias confirmadas
                                                 </td>
                                                 <td className="px-3 py-2.5">
                                                     <span className="text-gray-500 font-normal">
-                                                        Filtro: {grupoFilter === 'todos' ? 'Todos' : grupoFilter === 'novia' ? nombreNovia : nombreNovio}
+                                                        Filtro: {grupoFilter === 'todos' ? 'Todos' : grupoLabel(grupos, grupoFilter)}
                                                     </span>
                                                 </td>
                                                 <td className="px-3 py-2.5 text-gray-400 font-normal">—</td>
                                                 <td className="px-3 py-2.5 text-gray-900 font-bold">
-                                                    {totalPasesPotenciales} pases en total
+                                                    {totalPasesConfirmados} pases asignados
                                                 </td>
                                                 <td className="px-3 py-2.5 text-green-700 font-bold">
-                                                    {totalAsistentesConfirmados} confirmados
+                                                    {totalAsistentesConfirmados} asistentes
                                                 </td>
                                                 <td className="px-3 py-2.5 text-gray-400 font-normal">—</td>
                                                 <td className="px-3 py-2.5 text-gray-400 font-normal">—</td>
@@ -878,11 +882,10 @@ const AdminPanel = ({ user, onLogout }) => {
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-gray-200">
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Grupo:</span>
-                                <div className="flex gap-1">
+                                <div className="flex flex-wrap gap-1">
                                     {[
-                                        { id: 'todos', label: 'Todos' },
-                                        { id: 'novia', label: nombreNovia },
-                                        { id: 'novio', label: nombreNovio },
+                                        { id: 'todos', nombre: 'Todos' },
+                                        ...grupos,
                                     ].map((g) => (
                                         <button
                                             key={g.id}
@@ -893,7 +896,7 @@ const AdminPanel = ({ user, onLogout }) => {
                                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                             }`}
                                         >
-                                            {g.label}
+                                            {g.nombre}
                                         </button>
                                     ))}
                                 </div>
@@ -909,7 +912,7 @@ const AdminPanel = ({ user, onLogout }) => {
                                             apellido: '',
                                             telefono: '',
                                             email: '',
-                                            grupo: 'novia',
+                                            grupo: defaultGrupoId,
                                             slots_totales: 0,
                                             puede_subir_fotos: true,
                                         },
@@ -940,14 +943,14 @@ const AdminPanel = ({ user, onLogout }) => {
                                     </thead>
 
                                     <tbody className="divide-y divide-gray-100">
-                                        {titularesAgrupados.length === 0 ? (
+                                        {todosAgrupados.length === 0 ? (
                                             <tr>
                                                 <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
                                                     No hay invitados registrados en este grupo.
                                                 </td>
                                             </tr>
                                         ) : (
-                                            titularesAgrupados.map(({ titular, asistentes, fotosCount }) => {
+                                            todosAgrupados.map(({ titular, asistentes, fotosCount }) => {
                                                 const slotsCount = Number(titular.slots_totales ?? titular.slots ?? 0);
                                                 const totalPases = 1 + slotsCount;
                                                 const isCopied = copiedToken === titular.id;
@@ -960,13 +963,9 @@ const AdminPanel = ({ user, onLogout }) => {
 
                                                         <td className="px-3 py-2">
                                                             <span
-                                                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                                                    titular.grupo === 'novia'
-                                                                        ? 'bg-pink-100 text-pink-700'
-                                                                        : 'bg-blue-100 text-blue-700'
-                                                                }`}
+                                                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${grupoBadgeClass(grupos, titular.grupo)}`}
                                                             >
-                                                                {titular.grupo === 'novia' ? nombreNovia : nombreNovio}
+                                                                {grupoLabel(grupos, titular.grupo)}
                                                             </span>
                                                         </td>
 
@@ -1144,7 +1143,7 @@ const AdminPanel = ({ user, onLogout }) => {
                 {/* ════════════════════════════════════════════════════════════
                     TAB 4: CONFIGURACIÓN DINÁMICA DEL EVENTO
                 ════════════════════════════════════════════════════════════ */}
-                {tab === 'configuracion' && <ConfigTab confirmaciones={confirmaciones} />}
+                {tab === 'configuracion' && <ConfigTab confirmaciones={confirmaciones} invitados={invitados} />}
             </div>
 
             {/* ════════════════════════════════════════════════════════════
@@ -1406,15 +1405,16 @@ const AdminPanel = ({ user, onLogout }) => {
                                 <div>
                                     <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">Grupo *</label>
                                     <select
-                                        value={guestModal.data?.grupo || 'novia'}
+                                        value={guestModal.data?.grupo || defaultGrupoId}
                                         onChange={(e) =>
                                             setGuestModal({ ...guestModal, data: { ...guestModal.data, grupo: e.target.value } })
                                         }
                                         className="w-full p-2 rounded-lg border border-gray-300 text-xs focus:border-primary focus:outline-none bg-white"
                                         required
                                     >
-                                        <option value="novia">{nombreNovia} (Novia)</option>
-                                        <option value="novio">{nombreNovio} (Novio)</option>
+                                        {grupos.map((g) => (
+                                            <option key={g.id} value={g.id}>{g.nombre}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>

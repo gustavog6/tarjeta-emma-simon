@@ -5,11 +5,13 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { labelOf, nombreCompletoDe } from './menu';
+import { grupoLabel } from './grupos';
 
 export function exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilter = 'todos') {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     const platos = config?.menu?.platosFuertes || [];
     const contornos = config?.menu?.contornos || [];
+    const grupos = config?.grupos || [];
     const nombreNovia = config?.novios?.novia?.nombre || 'Novia';
     const nombreNovio = config?.novios?.novio?.nombre || 'Novio';
 
@@ -27,7 +29,7 @@ export function exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilte
     doc.setFontSize(9);
     doc.setTextColor(100);
     const filtroTexto =
-        grupoFilter === 'todos' ? 'Todos los grupos' : grupoFilter === 'novia' ? nombreNovia : nombreNovio;
+        grupoFilter === 'todos' ? 'Todos los grupos' : grupoLabel(grupos, grupoFilter);
     doc.text(
         `Generado: ${new Date().toLocaleString('es-ES')}  |  Filtro: ${filtroTexto}  |  Familias: ${titularesAgrupados.length}  |  Pases totales: ${totalPases}  |  Confirmados: ${totalConfirmados}`,
         40,
@@ -39,13 +41,13 @@ export function exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilte
     const conteoContornos = {};
 
     titularesAgrupados.forEach(({ titular, asistentes }) => {
-        const grupoLabel = titular.grupo === 'novia' ? nombreNovia : nombreNovio;
+        const grupoTxt = grupoLabel(grupos, titular.grupo);
         const titularNombre = `${titular.nombre} ${titular.apellido}`.trim();
         const totalCap = 1 + Number(titular.slots_totales ?? titular.slots ?? 0);
 
         if (asistentes.length === 0) {
             body.push([
-                grupoLabel,
+                grupoTxt,
                 titularNombre,
                 titular.telefono || '—',
                 `0 / ${totalCap}`,
@@ -67,7 +69,7 @@ export function exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilte
                 });
 
                 body.push([
-                    idx === 0 ? grupoLabel : '',
+                    idx === 0 ? grupoTxt : '',
                     idx === 0 ? titularNombre : '',
                     idx === 0 ? titular.telefono || '—' : '',
                     idx === 0 ? `${asistentes.length} / ${totalCap}` : '',

@@ -9,6 +9,7 @@ import {
     fromDateInputEndOfDay,
 } from '../utils/fechas';
 import { uniqueId, canonicalId } from '../utils/menu';
+import { COLOR_OPTIONS, GROUP_COLORS } from '../utils/grupos';
 
 const VENUE_TIPOS = [
     { value: 'ceremony', label: 'Ceremonia' },
@@ -25,7 +26,7 @@ const VESTIMENTA_SUGERENCIAS = [
     'Informal',
 ];
 
-const ConfigTab = ({ confirmaciones = [] }) => {
+const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
     const { config, saveConfig, reloadConfig } = useConfig();
     const [form, setForm] = useState(config);
     const [saveStatus, setSaveStatus] = useState({ loading: false, msg: null, error: false });
@@ -33,6 +34,8 @@ const ConfigTab = ({ confirmaciones = [] }) => {
     useEffect(() => {
         setForm(config);
     }, [config]);
+
+    const gruposEnUso = new Set(invitados.map((i) => i.grupo).filter(Boolean));
 
     const platosEnUso = new Set(
         confirmaciones
@@ -94,6 +97,21 @@ const ConfigTab = ({ confirmaciones = [] }) => {
         }
         const next = form.menu.contornos.filter((_, i) => i !== idx);
         setForm({ ...form, menu: { ...form.menu, contornos: next } });
+    };
+
+    const removeGrupo = (idx) => {
+        const g = (form.grupos || [])[idx];
+        if ((form.grupos || []).length <= 1) {
+            alert('Debe existir al menos un grupo de invitados.');
+            return;
+        }
+        if (gruposEnUso.has(g.id)) {
+            const ok = window.confirm(
+                `Atención: "${g.nombre}" ya está asignado a uno o más invitados.\n\nSi lo eliminas, esos invitados seguirán mostrando el código "${g.id}". ¿Deseas continuar?`
+            );
+            if (!ok) return;
+        }
+        setForm({ ...form, grupos: form.grupos.filter((_, i) => i !== idx) });
     };
 
     const updateText = (section, key, value) => {
@@ -209,9 +227,97 @@ const ConfigTab = ({ confirmaciones = [] }) => {
                     </div>
                 </section>
 
-                {/* 2. Fechas y Enlace Público / WhatsApp */}
+                {/* 2. Grupos de Invitados */}
                 <section className="space-y-3">
-                    <h3 className="text-xs font-bold text-primary uppercase tracking-wider">2. Fechas, URL Pública y Plantilla WhatsApp</h3>
+                    <h3 className="text-xs font-bold text-primary uppercase tracking-wider">2. Grupos de Invitados (Filtros y Selects)</h3>
+                    <div className="space-y-2 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <p className="text-[11px] text-gray-500">
+                            Estos grupos alimentan todos los filtros de las tablas, el selector al crear invitados y el Paso 1 del formulario RSVP.
+                        </p>
+                        {(form?.grupos || []).map((g, idx) => {
+                            const enUso = gruposEnUso.has(g.id);
+                            const badgeCls = GROUP_COLORS[g.color]?.badge || GROUP_COLORS.gray.badge;
+                            return (
+                                <div key={g.id || idx} className="flex flex-wrap md:flex-nowrap items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${badgeCls}`}>
+                                        {g.nombre || 'Vista'}
+                                    </span>
+                                    <input
+                                        type="text"
+                                        value={g.nombre || ''}
+                                        onChange={(e) => {
+                                            const next = [...form.grupos];
+                                            next[idx] = { ...next[idx], nombre: e.target.value };
+                                            setForm({ ...form, grupos: next });
+                                        }}
+                                        placeholder="Nombre del grupo"
+                                        className="flex-1 min-w-[140px] p-1.5 rounded border border-gray-300"
+                                        required
+                                    />
+                                    <select
+                                        value={g.color || 'gray'}
+                                        onChange={(e) => {
+                                            const next = [...form.grupos];
+                                            next[idx] = { ...next[idx], color: e.target.value };
+                                            setForm({ ...form, grupos: next });
+                                        }}
+                                        className="w-28 p-1.5 rounded border border-gray-300 bg-white"
+                                    >
+                                        {COLOR_OPTIONS.map((c) => (
+                                            <option key={c.value} value={c.value}>{c.label}</option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        type="text"
+                                        value={g.whatsapp || ''}
+                                        onChange={(e) => {
+                                            const next = [...form.grupos];
+                                            next[idx] = { ...next[idx], whatsapp: e.target.value };
+                                            setForm({ ...form, grupos: next });
+                                        }}
+                                        placeholder="WhatsApp (opcional)"
+                                        className="w-36 p-1.5 rounded border border-gray-300 font-mono text-[11px]"
+                                    />
+                                    {enUso && (
+                                        <span
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold shrink-0"
+                                            title="Hay invitados asignados a este grupo"
+                                        >
+                                            <AlertTriangle size={11} /> En uso
+                                        </span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => removeGrupo(idx)}
+                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
+                                        title="Eliminar grupo"
+                                    >
+                                        <Trash2 size={13} />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const list = form?.grupos || [];
+                                const nombre = 'Nuevo Grupo';
+                                const id = uniqueId(nombre, list);
+                                setForm({
+                                    ...form,
+                                    grupos: [...list, { id, nombre, color: 'green', whatsapp: '' }],
+                                });
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
+                        >
+                            <Plus size={12} /> Añadir Grupo
+                        </button>
+                    </div>
+                </section>
+
+                {/* 3. Fechas y Enlace Público / WhatsApp */}
+                <section className="space-y-3">
+                    <h3 className="text-xs font-bold text-primary uppercase tracking-wider">3. Fechas, URL Pública y Plantilla WhatsApp</h3>
                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>

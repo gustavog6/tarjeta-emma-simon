@@ -4,24 +4,24 @@
  */
 import * as XLSX from 'xlsx';
 import { labelOf, nombreCompletoDe } from './menu';
+import { grupoLabel } from './grupos';
 
 export function buildConfirmacionesRows(titularesAgrupados, config) {
     const platos = config?.menu?.platosFuertes || [];
     const contornos = config?.menu?.contornos || [];
-    const nombreNovia = config?.novios?.novia?.nombre || 'Novia';
-    const nombreNovio = config?.novios?.novio?.nombre || 'Novio';
+    const grupos = config?.grupos || [];
 
     const rows = [];
 
     titularesAgrupados.forEach(({ titular, asistentes, fotosCount }) => {
         const slotsVal = Number(titular.slots_totales ?? titular.slots ?? 0);
         const totalPases = 1 + slotsVal;
-        const grupoLabel = titular.grupo === 'novia' ? nombreNovia : nombreNovio;
+        const grupoTxt = grupoLabel(grupos, titular.grupo);
         const titularNombre = `${titular.nombre} ${titular.apellido}`.trim();
 
         if (asistentes.length === 0) {
             rows.push({
-                Grupo: grupoLabel,
+                Grupo: grupoTxt,
                 Titular: titularNombre,
                 Teléfono: titular.telefono || '',
                 Email: titular.email || '',
@@ -38,7 +38,7 @@ export function buildConfirmacionesRows(titularesAgrupados, config) {
         } else {
             asistentes.forEach((asistente) => {
                 rows.push({
-                    Grupo: grupoLabel,
+                    Grupo: grupoTxt,
                     Titular: titularNombre,
                     Teléfono: titular.telefono || '',
                     Email: titular.email || '',

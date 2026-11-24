@@ -35,6 +35,12 @@ export const evento = {
         },
     },
 
+    // ─── Grupos de invitados (dinámicos) ──────
+    grupos: [
+        { id: 'novia', nombre: 'Emma (Novia)', color: 'pink', whatsapp: '+584249743171' },
+        { id: 'novio', nombre: 'Simón (Novio)', color: 'blue', whatsapp: '+584140110568' },
+    ],
+
     // ─── Fecha y límite de RSVP ───────────────
     // Formato ISO 8601
     fecha: '2026-01-31T11:30:00',
