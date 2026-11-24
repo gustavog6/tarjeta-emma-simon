@@ -11,6 +11,7 @@ const MENSAJES = {
     plato_invalido: 'El plato elegido ya no está disponible en el menú.',
     contorno_invalido: 'Uno de los contornos elegidos ya no está disponible en el menú.',
     demasiados_contornos: 'Se eligieron más contornos de los permitidos.',
+    galeria_llena: 'La galería alcanzó el límite máximo de fotos para este evento.',
     no_autorizado: 'No tienes permiso para esta acción. Inicia sesión de nuevo.',
 };
 

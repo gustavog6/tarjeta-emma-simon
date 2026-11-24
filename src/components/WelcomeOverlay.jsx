@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
+import { INVITATION_LIMITS, clampText } from '../config/invitationLimits';
 import goldSilhouette from '../assets/corazon-verde-solo-2.png';
 
 /**
@@ -13,8 +14,9 @@ import goldSilhouette from '../assets/corazon-verde-solo-2.png';
  */
 const WelcomeOverlay = ({ onEnter }) => {
     const { config } = useConfig();
-    const { novia, novio } = config.novios;
-    const { boton } = config.textos.overlay;
+    const novia = { ...config.novios.novia, nombre: clampText(config.novios?.novia?.nombre, INVITATION_LIMITS.novios.nombreMax) };
+    const novio = { ...config.novios.novio, nombre: clampText(config.novios?.novio?.nombre, INVITATION_LIMITS.novios.nombreMax) };
+    const boton = clampText(config.textos?.overlay?.boton || 'Abrir invitación', INVITATION_LIMITS.hero.overlayBotonMax);
     const [soundEnabled, setSoundEnabled] = useState(true);
 
     const handleOpen = () => {
@@ -24,7 +26,7 @@ const WelcomeOverlay = ({ onEnter }) => {
     return (
         <AnimatePresence>
             <motion.div
-                className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center px-6 text-center select-none"
+                className="fixed inset-0 z-[100] min-h-dvh-safe safe-overlay bg-background flex flex-col items-center justify-center text-center select-none overflow-y-auto"
                 initial={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.8 }}
@@ -33,7 +35,7 @@ const WelcomeOverlay = ({ onEnter }) => {
                 <motion.img
                     src={goldSilhouette}
                     alt="Decoración"
-                    className="w-40 md:w-48 opacity-80 mb-6"
+                    className="w-36 sm:w-40 md:w-48 aspect-square object-contain opacity-80 mb-6"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 0.8, scale: 1 }}
                     transition={{ duration: 1, delay: 0.3 }}

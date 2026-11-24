@@ -7,19 +7,19 @@ const MapModal = ({ isOpen, onClose, locationUrl, title, externalLink }) => {
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-overlay">
                 {/* Backdrop */}
                 <motion.div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/60 modal-backdrop"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={onClose}
                 />
 
-                {/* Modal - Levemente más alto en versión web (h-[85vh] y min-h-[500px]) */}
+                {/* Modal */}
                 <motion.div
-                    className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden relative z-10 flex flex-col h-[85vh] max-h-[90vh]"
+                    className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden relative z-10 flex flex-col modal-map-sheet"
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}

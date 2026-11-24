@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Image as ImageIcon, Images, X } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
+import { INVITATION_LIMITS, limitList } from '../config/invitationLimits';
 import { supabase } from '../lib/supabase';
 import PhotoUploadModal from './PhotoUploadModal';
 import PhotoViewerModal from './PhotoViewerModal';
 
-const PREVIEW_LIMIT = 6;
+const PREVIEW_LIMIT = INVITATION_LIMITS.galeria.previewMax;
 
 const Gallery = ({ invitado }) => {
     const { config } = useConfig();
@@ -63,15 +64,17 @@ const Gallery = ({ invitado }) => {
     }, []);
 
     if (!config.galeria?.habilitada) return null;
+    if (!loading && photos.length === 0 && !puedeSubir) return null;
 
-    const visiblePhotos = photos.slice(0, PREVIEW_LIMIT);
-    const extraCount = Math.max(0, photos.length - PREVIEW_LIMIT);
+    const boundedPhotos = limitList(photos, INVITATION_LIMITS.galeria.totalVisibleMax);
+    const visiblePhotos = boundedPhotos.slice(0, PREVIEW_LIMIT);
+    const extraCount = Math.max(0, boundedPhotos.length - PREVIEW_LIMIT);
 
     return (
-        <section className="py-20 px-4 bg-background relative overflow-hidden">
-            <div className="max-w-5xl mx-auto text-center relative z-10">
+        <section className="py-20 px-4 bg-background relative overflow-x-clip">
+            <div className="max-w-5xl mx-auto text-center relative z-10 min-w-0">
                 <div className="mb-10">
-                    <h2 className="font-heading text-5xl text-primary mb-2">Galería de Recuerdos</h2>
+                    <h2 className="font-heading section-title-fluid text-primary mb-2">Galería de Recuerdos</h2>
                     <p className="text-gray-500 text-sm max-w-md mx-auto">
                         Toca cualquier foto para recorrer la galería y descargar tus favoritas en alta calidad.
                     </p>
@@ -159,14 +162,14 @@ const Gallery = ({ invitado }) => {
                 {isAllModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <motion.div
-                            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                            className="absolute inset-0 bg-black/70 modal-backdrop"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsAllModalOpen(false)}
                         />
                         <motion.div
-                            className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden border-2 border-primary/20"
+                            className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl modal-sheet flex flex-col overflow-hidden border-2 border-primary/20"
                             initial={{ scale: 0.94, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.94, opacity: 0 }}
@@ -187,7 +190,7 @@ const Gallery = ({ invitado }) => {
                                 </button>
                             </div>
                             <div className="p-5 overflow-y-auto custom-scrollbar grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                {photos.map((photo, idx) => (
+                                {boundedPhotos.map((photo, idx) => (
                                     <div
                                         key={photo.id || idx}
                                         onClick={() => setViewerIndex(idx)}
@@ -217,7 +220,7 @@ const Gallery = ({ invitado }) => {
             <PhotoViewerModal
                 isOpen={viewerIndex !== null}
                 onClose={() => setViewerIndex(null)}
-                photos={photos}
+                photos={boundedPhotos}
                 currentIndex={viewerIndex ?? 0}
                 onChangeIndex={setViewerIndex}
             />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Gift, Copy, Check } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
+import { INVITATION_LIMITS, limitList } from '../config/invitationLimits';
 
 const GiftModal = ({ isOpen, onClose }) => {
     const { config } = useConfig();
@@ -15,15 +16,16 @@ const GiftModal = ({ isOpen, onClose }) => {
         setTimeout(() => setCopiedIndex(null), 2000);
     };
 
-    const { datosBancarios, textos } = config;
+    const datosBancarios = limitList(config.datosBancarios, INVITATION_LIMITS.datosBancarios.max);
+    const { textos } = config;
     const { titulo, subtitulo } = textos.regalos;
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-overlay">
                 {/* Backdrop */}
                 <motion.div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/60 modal-backdrop"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -32,7 +34,7 @@ const GiftModal = ({ isOpen, onClose }) => {
 
                 {/* Modal */}
                 <motion.div
-                    className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative z-10 glass-panel border-2 border-primary/20 flex flex-col max-h-[90vh]"
+                    className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative z-10 glass-panel border-2 border-primary/20 flex flex-col modal-sheet"
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}

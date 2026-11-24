@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { parseFecha } from '../utils/fechas';
 import { friendlyError } from '../utils/errores';
 import { findGrupo, grupoLabel, grupoColorStyle } from '../utils/grupos';
+import { INVITATION_LIMITS, limitList } from '../config/invitationLimits';
 import vestido from '../assets/vestido-verde.png';
 import camisa from '../assets/camisa-verde.png';
 
@@ -25,7 +26,10 @@ const fullNameOf = (g) => `${g.nombre || ''} ${g.apellido || ''}`.trim();
 
 const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onConfirmed }) => {
     const { config } = useConfig();
-    const { novios, menu, fecha, textos, grupos = [] } = config;
+    const { novios, menu, fecha, textos } = config;
+    const grupos = limitList(config.grupos, INVITATION_LIMITS.grupos.max);
+    const platosList = limitList(menu?.platosFuertes, INVITATION_LIMITS.menu.platosMax);
+    const contornosList = limitList(menu?.contornos, INVITATION_LIMITS.menu.contornosMax);
     const rawSlots = Number(invitado?.slots_totales ?? invitado?.slots ?? 0);
     const maxSlots = 1 + rawSlots;
     const yaConfirmados = confirmacionesPrevias.length;
@@ -250,9 +254,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-overlay">
                 <motion.div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/60 modal-backdrop"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -260,7 +264,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                 />
 
                 <motion.div
-                    className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden relative z-10 glass-panel border-2 border-primary/20 max-h-[90vh] overflow-y-auto"
+                    className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden relative z-10 glass-panel border-2 border-primary/20 modal-sheet overflow-y-auto"
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}
@@ -576,7 +580,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                         </h4>
 
                                         <div className="space-y-2 pt-2">
-                                            {(menu?.platosFuertes || []).map((plato) => (
+                                            {platosList.map((plato) => (
                                                 <motion.button
                                                     key={plato.id}
                                                     onClick={() => updateCurrentGuest({ platoFuerte: plato })}
@@ -607,7 +611,13 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                                 Atrás
                                             </button>
                                             <button
-                                                onClick={() => setMenuStep('contornos')}
+                                                onClick={() => {
+                                                    if (contornosList.length === 0 || maxContornos === 0) {
+                                                        goToNextGuest();
+                                                    } else {
+                                                        setMenuStep('contornos');
+                                                    }
+                                                }}
                                                 disabled={!currentGuest.platoFuerte}
                                                 className={`flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                                                     currentGuest.platoFuerte
@@ -632,7 +642,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                         </p>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            {(menu?.contornos || []).map((contorno) => {
+                                            {contornosList.map((contorno) => {
                                                 const isSelected = currentGuest.contornos.find((c) => c.id === contorno.id);
                                                 const isDisabled = currentGuest.contornos.length >= maxContornos && !isSelected;
 

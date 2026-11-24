@@ -5,12 +5,14 @@ import { useConfig } from '../context/ConfigContext';
 import { useCountdown } from '../hooks/useCountdown';
 import { downloadCalendarEvent } from '../utils/ics';
 import { parseFecha } from '../utils/fechas';
+import { INVITATION_LIMITS, clampText } from '../config/invitationLimits';
 import StoryBannerModal from './StoryBannerModal';
 
 const SaveTheDate = () => {
     const { config } = useConfig();
     const { fecha, textos, venues, novios } = config;
-    const { titulo, diaSemana } = textos.saveTheDate;
+    const titulo = clampText(textos?.saveTheDate?.titulo || 'Save the Date', INVITATION_LIMITS.saveTheDate.tituloMax);
+    const diaSemana = clampText(textos?.saveTheDate?.diaSemana, INVITATION_LIMITS.saveTheDate.diaSemanaMax);
     const timeLeft = useCountdown(fecha);
     const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 
@@ -53,12 +55,14 @@ const SaveTheDate = () => {
                     transition={{ duration: 1 }}
                     className="mb-12"
                 >
-                    <h2 className="font-heading text-5xl text-primary/90 mb-4 italic">{titulo}</h2>
-                    <div className="flex items-center justify-center gap-4">
-                        <div className="h-[1px] w-12 bg-primary/20" />
-                        <span className="font-body text-gray-500 tracking-[.5em] uppercase text-xs">{diaSemana}</span>
-                        <div className="h-[1px] w-12 bg-primary/20" />
-                    </div>
+                    <h2 className="font-heading section-title-fluid text-primary/90 mb-4 italic break-anywhere">{titulo}</h2>
+                    {diaSemana && (
+                        <div className="flex items-center justify-center gap-3 sm:gap-4">
+                            <div className="h-[1px] w-10 sm:w-12 bg-primary/20 shrink-0" />
+                            <span className="font-body text-gray-500 tracking-[0.35em] uppercase text-xs break-anywhere">{diaSemana}</span>
+                            <div className="h-[1px] w-10 sm:w-12 bg-primary/20 shrink-0" />
+                        </div>
+                    )}
                 </motion.div>
 
                 {/* Fecha y hora */}

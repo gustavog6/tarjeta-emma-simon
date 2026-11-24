@@ -6,20 +6,27 @@
 
 :root {
   /* Elegant Gold & White Theme (Default) */
-  --color-primary: #7FB383; /* Tuequesa  */
-  --color-secondary: #658F68; /* Champagne */
-  --color-accent: #658F68; /* Pale Gold */
-  --color-background: #FCFCFA; /* Off-white / Cream */
-  --color-surface: #FFFFFF; /* Pure White */
+  --color-primary: #7FB383;
+  --color-secondary: #658F68;
+  --color-accent: #658F68;
+  --color-background: #FCFCFA;
+  --color-surface: #FFFFFF;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: clip;
 }
 
 body {
   @apply bg-background text-gray-800 font-body;
   background-image: url('/images/bg-texture.png');
   background-repeat: repeat;
-  background-size: 400px; /* Adjust scale */
+  background-size: 400px;
   background-blend-mode: multiply;
-  overflow-x: hidden;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -37,7 +44,69 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .glass-panel {
-  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl;
+  @apply bg-white/90 border border-white/20 shadow-xl rounded-2xl;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* ─── Cross-browser Mobile Helpers (Safari iOS / Chrome / Brave / Opera) ─── */
+
+.min-h-dvh-safe {
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+.safe-overlay {
+  padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(1.5rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1.5rem + env(safe-area-inset-right, 0px));
+}
+
+.safe-bottom-fab {
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  right: calc(1.5rem + env(safe-area-inset-right, 0px));
+}
+
+.safe-bottom-arrow {
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.modal-backdrop {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.modal-sheet {
+  max-height: 90vh;
+  max-height: 90dvh;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-map-sheet {
+  height: 85vh;
+  height: 85dvh;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overscroll-behavior: contain;
+}
+
+.break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Tipografía fluida calibrada para 360px–1440px */
+.hero-title-fluid {
+  font-size: clamp(2.85rem, 12vw, 7.5rem);
+  line-height: 1.08;
+}
+
+.section-title-fluid {
+  font-size: clamp(2.35rem, 8.5vw, 3.25rem);
+  line-height: 1.15;
 }
 
 :root {

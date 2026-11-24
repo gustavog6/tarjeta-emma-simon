@@ -188,9 +188,9 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-overlay">
                 <motion.div
-                    className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/70 modal-backdrop"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -198,7 +198,7 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
                 />
 
                 <motion.div
-                    className="relative z-10 bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full p-6 text-center border-2 border-primary/20 max-h-[95vh] flex flex-col justify-between"
+                    className="relative z-10 bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full p-6 text-center border-2 border-primary/20 modal-sheet overflow-y-auto flex flex-col justify-between"
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}

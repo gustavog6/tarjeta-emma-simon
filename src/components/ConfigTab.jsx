@@ -10,6 +10,7 @@ import {
 } from '../utils/fechas';
 import { uniqueId, canonicalId } from '../utils/menu';
 import { COLOR_OPTIONS, GROUP_COLORS } from '../utils/grupos';
+import { INVITATION_LIMITS } from '../config/invitationLimits';
 
 const VENUE_TIPOS = [
     { value: 'ceremony', label: 'Ceremonia (Presencial)' },
@@ -384,8 +385,10 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                         })}
                         <button
                             type="button"
+                            disabled={(form?.grupos || []).length >= INVITATION_LIMITS.grupos.max}
                             onClick={() => {
                                 const list = form?.grupos || [];
+                                if (list.length >= INVITATION_LIMITS.grupos.max) return;
                                 const nombre = 'Nuevo Grupo';
                                 const id = uniqueId(nombre, list);
                                 setForm({
@@ -393,9 +396,9 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                                     grupos: [...list, { id, nombre, color: 'green', whatsapp: '' }],
                                 });
                             }}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <Plus size={12} /> Añadir Grupo
+                            <Plus size={12} /> Añadir Grupo ({(form?.grupos || []).length}/{INVITATION_LIMITS.grupos.max})
                         </button>
                     </div>
                 </CollapsibleSection>
@@ -542,8 +545,10 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                                     })}
                                     <button
                                         type="button"
+                                        disabled={(form?.menu?.platosFuertes || []).length >= INVITATION_LIMITS.menu.platosMax}
                                         onClick={() => {
                                             const list = form?.menu?.platosFuertes || [];
+                                            if (list.length >= INVITATION_LIMITS.menu.platosMax) return;
                                             const nombre = 'Nuevo Plato';
                                             const id = uniqueId(nombre, list);
                                             setForm({
@@ -551,9 +556,9 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                                                 menu: { ...form.menu, platosFuertes: [...list, { id, nombre }] },
                                             });
                                         }}
-                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1 disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
-                                        <Plus size={12} /> Añadir Plato Fuerte
+                                        <Plus size={12} /> Añadir Plato Fuerte ({(form?.menu?.platosFuertes || []).length}/{INVITATION_LIMITS.menu.platosMax})
                                     </button>
                                 </div>
                             </div>
@@ -600,8 +605,10 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                                     })}
                                     <button
                                         type="button"
+                                        disabled={(form?.menu?.contornos || []).length >= INVITATION_LIMITS.menu.contornosMax}
                                         onClick={() => {
                                             const list = form?.menu?.contornos || [];
+                                            if (list.length >= INVITATION_LIMITS.menu.contornosMax) return;
                                             const nombre = 'Nuevo Contorno';
                                             const id = uniqueId(nombre, list);
                                             setForm({
@@ -609,9 +616,9 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                                                 menu: { ...form.menu, contornos: [...list, { id, nombre }] },
                                             });
                                         }}
-                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1 disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
-                                        <Plus size={12} /> Añadir Contorno
+                                        <Plus size={12} /> Añadir Contorno ({(form?.menu?.contornos || []).length}/{INVITATION_LIMITS.menu.contornosMax})
                                     </button>
                                 </div>
                             </div>
@@ -813,7 +820,9 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                         })}
                         <button
                             type="button"
-                            onClick={() =>
+                            disabled={(form?.venues || []).length >= INVITATION_LIMITS.venues.max}
+                            onClick={() => {
+                                if ((form?.venues || []).length >= INVITATION_LIMITS.venues.max) return;
                                 setForm({
                                     ...form,
                                     venues: [
@@ -829,11 +838,11 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                                             externalLink: '',
                                         },
                                     ],
-                                })
-                            }
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                                });
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <Plus size={12} /> Añadir Ubicación / Transmisión
+                            <Plus size={12} /> Añadir Ubicación / Transmisión ({(form?.venues || []).length}/{INVITATION_LIMITS.venues.max})
                         </button>
                     </div>
                 </CollapsibleSection>
@@ -903,18 +912,20 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                         })}
                         <button
                             type="button"
-                            onClick={() =>
+                            disabled={(form?.itinerario || []).length >= INVITATION_LIMITS.itinerario.max}
+                            onClick={() => {
+                                if ((form?.itinerario || []).length >= INVITATION_LIMITS.itinerario.max) return;
                                 setForm({
                                     ...form,
                                     itinerario: [
                                         ...(form.itinerario || []),
                                         { hora: '', titulo: '', icono: 'Sparkles' },
                                     ],
-                                })
-                            }
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1"
+                                });
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer pt-1 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <Plus size={12} /> Añadir Momento al Itinerario
+                            <Plus size={12} /> Añadir Momento al Itinerario ({(form?.itinerario || []).length}/{INVITATION_LIMITS.itinerario.max})
                         </button>
                     </div>
                 </CollapsibleSection>
@@ -1061,18 +1072,20 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                         ))}
                         <button
                             type="button"
-                            onClick={() =>
+                            disabled={(form?.datosBancarios || []).length >= INVITATION_LIMITS.datosBancarios.max}
+                            onClick={() => {
+                                if ((form?.datosBancarios || []).length >= INVITATION_LIMITS.datosBancarios.max) return;
                                 setForm({
                                     ...form,
                                     datosBancarios: [
                                         ...(form.datosBancarios || []),
                                         { banco: 'Banesco', tipo: 'Pago Móvil', titular: '', telefono: '', cedula: '' },
                                     ],
-                                })
-                            }
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                                });
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <Plus size={12} /> Añadir Cuenta Bancaria
+                            <Plus size={12} /> Añadir Cuenta Bancaria ({(form?.datosBancarios || []).length}/{INVITATION_LIMITS.datosBancarios.max})
                         </button>
                     </div>
                 </CollapsibleSection>
@@ -1197,15 +1210,17 @@ const ConfigTab = ({ confirmaciones = [], invitados = [] }) => {
                             ))}
                             <button
                                 type="button"
-                                onClick={() =>
+                                disabled={(form?.padrinos || []).length >= INVITATION_LIMITS.padrinos.max}
+                                onClick={() => {
+                                    if ((form?.padrinos || []).length >= INVITATION_LIMITS.padrinos.max) return;
                                     setForm({
                                         ...form,
                                         padrinos: [...(form.padrinos || []), { nombre: '', rol: 'Padrino' }],
-                                    })
-                                }
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                                    });
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                                <Plus size={12} /> Añadir Padrino / Madrina
+                                <Plus size={12} /> Añadir Padrino / Madrina ({(form?.padrinos || []).length}/{INVITATION_LIMITS.padrinos.max})
                             </button>
                         </div>
                     </div>

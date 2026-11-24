@@ -2,15 +2,17 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Heart, Sparkles } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
+import { INVITATION_LIMITS, limitList, clampText } from '../config/invitationLimits';
 
 const ParentsSection = () => {
     const { config } = useConfig();
-    const { padres, padrinos } = config;
+    const { padres } = config;
+    const padrinos = limitList(config.padrinos, INVITATION_LIMITS.padrinos.max);
 
-    const tienePadresNovia = Boolean(padres?.novia?.padre || padres?.novia?.madre);
-    const tienePadresNovio = Boolean(padres?.novio?.padre || padres?.novio?.madre);
+    const tienePadresNovia = Boolean(padres?.novia?.padre?.trim() || padres?.novia?.madre?.trim());
+    const tienePadresNovio = Boolean(padres?.novio?.padre?.trim() || padres?.novio?.madre?.trim());
     const tienePadres = tienePadresNovia || tienePadresNovio;
-    const tienePadrinos = Array.isArray(padrinos) && padrinos.length > 0;
+    const tienePadrinos = padrinos.length > 0;
 
     if (!tienePadres && !tienePadrinos) return null;
 
@@ -39,7 +41,7 @@ const ParentsSection = () => {
                     viewport={{ once: true }}
                     transition={{ duration: 0.8 }}
                 >
-                    <h2 className="font-heading text-5xl text-primary mb-4">Con la bendición de</h2>
+                    <h2 className="font-heading section-title-fluid text-primary mb-4">Con la bendición de</h2>
                     <div className="flex items-center justify-center gap-4">
                         <div className="h-[1px] w-12 bg-primary/30" />
                         <span className="font-body text-gray-500 tracking-[0.35em] uppercase text-xs">

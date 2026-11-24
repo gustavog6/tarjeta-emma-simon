@@ -24,7 +24,7 @@ export default function AccessGate({ children }) {
     // ── Cargando ──────────────────────────────
     if (loading) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
+            <div className="min-h-dvh-safe safe-overlay bg-background flex items-center justify-center">
                 <motion.div
                     className="text-center"
                     initial={{ opacity: 0 }}
@@ -41,14 +41,14 @@ export default function AccessGate({ children }) {
     // ── Token inválido / ausente ───────────────
     if (!invitado) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center px-6">
+            <div className="min-h-dvh-safe safe-overlay bg-background flex items-center justify-center">
                 <motion.div
-                    className="text-center max-w-sm"
+                    className="text-center max-w-sm min-w-0"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8 }}
                 >
-                    <p className="font-heading text-5xl text-primary mb-4">
+                    <p className="font-heading section-title-fluid text-primary mb-4 break-anywhere">
                         {config.novios.novio.nombre} &amp; {config.novios.novia.nombre}
                     </p>
                     <div className="h-px w-16 bg-primary/30 mx-auto mb-6" />

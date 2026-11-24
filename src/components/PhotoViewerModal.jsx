@@ -55,10 +55,10 @@ const PhotoViewerModal = ({ isOpen, onClose, photos = [], currentIndex = 0, onCh
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 safe-overlay">
                 {/* Backdrop */}
                 <motion.div
-                    className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                    className="absolute inset-0 bg-black/80 modal-backdrop"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -67,7 +67,7 @@ const PhotoViewerModal = ({ isOpen, onClose, photos = [], currentIndex = 0, onCh
 
                 {/* Modal Window */}
                 <motion.div
-                    className="relative z-10 max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col border border-primary/20 max-h-[90vh]"
+                    className="relative z-10 max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col border border-primary/20 modal-sheet"
                     initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.92, opacity: 0 }}

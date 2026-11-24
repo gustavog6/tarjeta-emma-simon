@@ -1,19 +1,23 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useConfig } from '../context/ConfigContext';
+import { INVITATION_LIMITS, clampText } from '../config/invitationLimits';
 import ManoElegante from '../assets/emmasimonmanoelegante.png';
 
 const QuoteSection = () => {
     const { config } = useConfig();
-    const { texto, firma } = config.textos.quote;
+    const texto = clampText(config.textos?.quote?.texto, INVITATION_LIMITS.quote.textoMax);
+    const firma = clampText(config.textos?.quote?.firma, INVITATION_LIMITS.quote.firmaMax);
+
+    if (!texto && !firma) return null;
 
     return (
-        <section className="py-16 px-6 bg-background relative overflow-hidden flex items-center justify-center">
+        <section className="py-16 px-6 bg-background relative overflow-x-clip flex items-center justify-center">
             <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none">
                 <img src="/images/bg-texture.png" className="w-full h-full object-cover" alt="" />
             </div>
 
-            <div className="max-w-3xl mx-auto text-center relative z-10">
+            <div className="max-w-3xl mx-auto text-center relative z-10 min-w-0">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     whileInView={{ opacity: 0.8, scale: 1 }}
@@ -21,7 +25,7 @@ const QuoteSection = () => {
                     transition={{ duration: 1 }}
                     className="mb-8 flex justify-center"
                 >
-                    <img src={ManoElegante} alt="Decoración" className="w-48 h-48 object-contain" />
+                    <img src={ManoElegante} alt="Decoración" className="w-40 h-40 sm:w-48 sm:h-48 aspect-square object-contain" />
                 </motion.div>
 
                 <motion.div
@@ -29,16 +33,21 @@ const QuoteSection = () => {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.3, duration: 1 }}
+                    className="min-w-0"
                 >
-                    <p className="font-body text-2xl md:text-3xl lg:text-4xl text-gray-600 font-light italic leading-relaxed mb-10">
-                        {texto}
-                    </p>
-                    <div className="flex flex-col items-center">
-                        <div className="h-[1px] w-12 bg-primary/30 mb-6" />
-                        <p className="font-heading text-3xl md:text-4xl text-primary tracking-wide">
-                            {firma}
+                    {texto && (
+                        <p className="font-body text-xl sm:text-2xl md:text-3xl lg:text-4xl text-gray-600 font-light italic leading-relaxed mb-10 break-anywhere">
+                            {texto}
                         </p>
-                    </div>
+                    )}
+                    {firma && (
+                        <div className="flex flex-col items-center">
+                            <div className="h-[1px] w-12 bg-primary/30 mb-6" />
+                            <p className="font-heading text-3xl md:text-4xl text-primary tracking-wide break-anywhere">
+                                {firma}
+                            </p>
+                        </div>
+                    )}
                 </motion.div>
             </div>
         </section>

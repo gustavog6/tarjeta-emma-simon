@@ -6,6 +6,7 @@ import RsvpModal from './RsvpModal';
 import GiftModal from './GiftModal';
 import { useConfig } from '../context/ConfigContext';
 import { nombreCompletoDe } from '../utils/menu';
+import { INVITATION_LIMITS, limitList, clampText } from '../config/invitationLimits';
 
 const RsvpSection = ({ invitado, confirmaciones = [], onReload }) => {
     const { config } = useConfig();
@@ -13,6 +14,17 @@ const RsvpSection = ({ invitado, confirmaciones = [], onReload }) => {
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
 
     const { textos } = config;
+    const tieneVestimenta = Boolean(config.vestimenta?.tipo?.trim());
+    const cuentasBancarias = limitList(config.datosBancarios, INVITATION_LIMITS.datosBancarios.max);
+    const tieneRegalos = cuentasBancarias.length > 0;
+    const totalCards = 1 + (tieneVestimenta ? 1 : 0) + (tieneRegalos ? 1 : 0);
+    const gridClass =
+        totalCards === 3
+            ? 'max-w-6xl md:grid-cols-3'
+            : totalCards === 2
+                ? 'max-w-4xl md:grid-cols-2'
+                : 'max-w-lg grid-cols-1';
+
     const rawSlots = Number(invitado?.slots_totales ?? invitado?.slots ?? 0);
     const maxSlots = 1 + rawSlots;
 
@@ -26,19 +38,24 @@ const RsvpSection = ({ invitado, confirmaciones = [], onReload }) => {
     const isPartiallyConfirmed = confirmadosCount > 0 && cuposRestantes > 0;
     const isFullyConfirmed = confirmadosCount >= maxSlots;
 
-    return (
-        <section className="py-20 px-4 bg-background">
-            <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 items-stretch">
+    const rsvpTitulo = clampText(textos?.rsvp?.titulo || 'Confirmar Asistencia', INVITATION_LIMITS.rsvp.tituloMax);
+    const rsvpSubtitulo = clampText(textos?.rsvp?.subtitulo, INVITATION_LIMITS.rsvp.subtituloMax);
+    const regalosTitulo = clampText(textos?.regalos?.titulo || 'Mesa de Regalos', INVITATION_LIMITS.datosBancarios.sectionTituloMax);
+    const regalosSubtitulo = clampText(textos?.regalos?.subtitulo, INVITATION_LIMITS.datosBancarios.sectionSubtituloMax);
 
-                {/* Código de vestimenta */}
-                <DressCode />
+    return (
+        <section className="py-20 px-4 bg-background overflow-x-clip">
+            <div className={`mx-auto grid gap-8 items-stretch ${gridClass}`}>
+
+                {/* Código de vestimenta (opcional) */}
+                {tieneVestimenta && <DressCode />}
 
                 {/* Confirmar asistencia */}
                 <motion.div
-                    className="bg-white p-8 rounded-2xl shadow-lg border-t-4 border-primary text-center group flex flex-col justify-between"
+                    className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border-t-4 border-primary text-center group flex flex-col justify-between min-w-0"
                     whileHover={{ y: -5 }}
                 >
-                    <div>
+                    <div className="min-w-0">
                         <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
                             {isFullyConfirmed ? (
                                 <CheckCircle2 size={32} className="text-green-600" />
@@ -48,7 +65,7 @@ const RsvpSection = ({ invitado, confirmaciones = [], onReload }) => {
                                 <MessageCircle size={32} />
                             )}
                         </div>
-                        <h3 className="text-4xl mb-2 font-heading">{textos.rsvp.titulo}</h3>
+                        <h3 className="text-3xl sm:text-4xl mb-2 font-heading break-anywhere">{rsvpTitulo}</h3>
 
                         {isFullyConfirmed ? (
                             <div className="mt-5 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm space-y-2.5">
@@ -90,8 +107,8 @@ const RsvpSection = ({ invitado, confirmaciones = [], onReload }) => {
                                 )}
                             </div>
                         ) : (
-                            <p className="text-gray-600 mb-6 text-sm leading-relaxed">
-                                {textos.rsvp.subtitulo}
+                            <p className="text-gray-600 mb-6 text-sm leading-relaxed break-anywhere">
+                                {rsvpSubtitulo}
                             </p>
                         )}
                     </div>
@@ -116,28 +133,30 @@ const RsvpSection = ({ invitado, confirmaciones = [], onReload }) => {
                     )}
                 </motion.div>
 
-                {/* Mesa de regalos */}
-                <motion.div
-                    className="bg-white p-8 rounded-2xl shadow-lg border-t-4 border-primary text-center group flex flex-col justify-between"
-                    whileHover={{ y: -5 }}
-                >
-                    <div>
-                        <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
-                            <Gift size={32} />
-                        </div>
-                        <h3 className="text-4xl mb-2 font-heading">{textos.regalos.titulo}</h3>
-                        <p className="text-gray-600 mb-6 text-sm leading-relaxed">
-                            {textos.regalos.subtitulo}
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => setIsGiftModalOpen(true)}
-                        className="inline-flex items-center justify-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-secondary transition-colors font-bold shadow-md hover:shadow-lg cursor-pointer mt-4"
+                {/* Mesa de regalos (opcional) */}
+                {tieneRegalos && (
+                    <motion.div
+                        className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border-t-4 border-primary text-center group flex flex-col justify-between min-w-0"
+                        whileHover={{ y: -5 }}
                     >
-                        <Gift size={18} />
-                        Ver Datos Bancarios
-                    </button>
-                </motion.div>
+                        <div className="min-w-0">
+                            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
+                                <Gift size={32} />
+                            </div>
+                            <h3 className="text-3xl sm:text-4xl mb-2 font-heading break-anywhere">{regalosTitulo}</h3>
+                            <p className="text-gray-600 mb-6 text-sm leading-relaxed break-anywhere">
+                                {regalosSubtitulo}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setIsGiftModalOpen(true)}
+                            className="inline-flex items-center justify-center gap-2 bg-primary text-white px-6 py-3 rounded-full hover:bg-secondary transition-colors font-bold shadow-md hover:shadow-lg cursor-pointer mt-4"
+                        >
+                            <Gift size={18} />
+                            Ver Datos Bancarios
+                        </button>
+                    </motion.div>
+                )}
 
             </div>
 
