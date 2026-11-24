@@ -277,8 +277,8 @@ const AdminPanel = ({ user, onLogout }) => {
             alert('Debes seleccionar un plato fuerte.');
             return;
         }
-        if (maxContornos > 0 && contornosList.length >= maxContornos && asistenteModal.contornos.length !== maxContornos) {
-            alert(`Debes seleccionar exactamente ${maxContornos} contorno(s).`);
+        if (maxContornos > 0 && contornosList.length > 0 && asistenteModal.contornos.length < 1) {
+            alert(`Debes seleccionar al menos 1 contorno (máximo ${maxContornos}).`);
             return;
         }
 
@@ -1248,7 +1248,7 @@ const AdminPanel = ({ user, onLogout }) => {
                             {maxContornos > 0 && contornosList.length > 0 && (
                                 <div>
                                     <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
-                                        Contornos * ({asistenteModal.contornos.length}/{maxContornos})
+                                        Contornos * (mín. 1, máx. {maxContornos} — {asistenteModal.contornos.length} selec.)
                                     </label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {contornosList.map((c) => {

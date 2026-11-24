@@ -628,7 +628,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                             Contornos para <span className="text-primary font-heading text-3xl">{fullNameOf(currentGuest)}</span>
                                         </h4>
                                         <p className="text-xs text-gray-500 text-center mb-4">
-                                            {currentGuest.contornos.length}/{maxContornos} seleccionados
+                                            Selecciona entre 1 y {maxContornos} ({currentGuest.contornos.length}/{maxContornos} seleccionados)
                                         </p>
 
                                         <div className="grid grid-cols-2 gap-2">
@@ -670,9 +670,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                             </button>
                                             <button
                                                 onClick={goToNextGuest}
-                                                disabled={currentGuest.contornos.length !== maxContornos}
+                                                disabled={maxContornos > 0 && currentGuest.contornos.length < 1}
                                                 className={`flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                                    currentGuest.contornos.length === maxContornos
+                                                    maxContornos === 0 || currentGuest.contornos.length >= 1
                                                         ? 'bg-primary text-white hover:bg-secondary shadow-md'
                                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                                 }`}

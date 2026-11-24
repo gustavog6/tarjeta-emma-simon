@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Church, GlassWater, MapPin, Video, Music } from 'lucide-react';
+import { Church, GlassWater, MapPin, Video, Radio, ExternalLink } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import MapModal from './MapModal';
 
 // Mapa de tipo → icono de Lucide
 const ICONS = {
-    ceremony:  <Church    className="w-12 h-12 text-primary" />,
+    ceremony:  <Church     className="w-12 h-12 text-primary" />,
     reception: <GlassWater className="w-12 h-12 text-primary" />,
-    live:      <Music     className="w-12 h-12 text-primary" />,
-    videocall: <Video     className="w-12 h-12 text-primary" />,
+    live:      <Radio      className="w-12 h-12 text-primary" />,
+    videocall: <Video      className="w-12 h-12 text-primary" />,
 };
+
+const isVirtualVenue = (tipo) => tipo === 'live' || tipo === 'videocall';
 
 const EventCards = () => {
     const [modalOpen,  setModalOpen]  = useState(false);
@@ -38,34 +40,69 @@ const EventCards = () => {
                 </div>
 
                 <div className={`gap-8 ${venues.length === 1 ? 'flex justify-center' : 'grid md:grid-cols-2'}`}>
-                    {venues.map((venue, idx) => (
-                        <motion.div
-                            key={venue.id}
-                            className={`bg-white p-8 rounded-2xl shadow-lg border border-primary/10 flex flex-col items-center text-center hover:shadow-xl transition-all hover:scale-[1.02] group ${venues.length === 1 ? 'w-full max-w-xl' : ''}`}
-                            initial={{ y: 50, opacity: 0 }}
-                            whileInView={{ y: 0, opacity: 1 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: idx * 0.2 }}
-                        >
-                            <div className="mb-6 p-4 bg-secondary/20 rounded-full group-hover:bg-primary/20 transition-colors">
-                                {ICONS[venue.tipo] ?? ICONS.ceremony}
-                            </div>
-                            <h3 className="text-4xl mb-2">{venue.titulo}</h3>
-                            <p className="text-xl font-bold text-gray-500 mb-1">{venue.lugar}</p>
-                            <p className="text-gray-400 text-sm mb-1">{venue.direccion}</p>
-                            <p className="text-gray-500 mb-6">{venue.hora}</p>
+                    {venues.map((venue, idx) => {
+                        const virtual = isVirtualVenue(venue.tipo);
+                        const linkAcceso = venue.streamUrl || venue.externalLink || '';
+                        const subtituloLugar = virtual ? (venue.plataforma || venue.lugar) : venue.lugar;
 
-                            <div className="mt-auto">
-                                <button
-                                    onClick={() => openMap(venue)}
-                                    className="flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-full hover:bg-secondary transition-colors shadow-md cursor-pointer"
-                                >
-                                    <MapPin size={18} />
-                                    Ver Mapa
-                                </button>
-                            </div>
-                        </motion.div>
-                    ))}
+                        return (
+                            <motion.div
+                                key={venue.id || idx}
+                                className={`bg-white p-8 rounded-2xl shadow-lg border border-primary/10 flex flex-col items-center text-center hover:shadow-xl transition-all hover:scale-[1.02] group ${venues.length === 1 ? 'w-full max-w-xl' : ''}`}
+                                initial={{ y: 50, opacity: 0 }}
+                                whileInView={{ y: 0, opacity: 1 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: idx * 0.2 }}
+                            >
+                                <div className="mb-6 p-4 bg-secondary/20 rounded-full group-hover:bg-primary/20 transition-colors">
+                                    {ICONS[venue.tipo] ?? ICONS.ceremony}
+                                </div>
+                                <h3 className="text-4xl mb-2">{venue.titulo}</h3>
+                                {subtituloLugar && (
+                                    <p className="text-xl font-bold text-gray-500 mb-1">{subtituloLugar}</p>
+                                )}
+                                {!virtual && venue.direccion && (
+                                    <p className="text-gray-400 text-sm mb-1">{venue.direccion}</p>
+                                )}
+                                {virtual && venue.codigoAcceso && (
+                                    <p className="text-xs text-primary bg-primary/10 px-3 py-1 rounded-full font-semibold my-1.5">
+                                        {venue.codigoAcceso}
+                                    </p>
+                                )}
+                                {venue.hora && (
+                                    <p className="text-gray-500 mb-6">{venue.hora}</p>
+                                )}
+
+                                <div className="mt-auto">
+                                    {virtual ? (
+                                        linkAcceso ? (
+                                            <a
+                                                href={linkAcceso}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 bg-primary text-white px-6 py-2.5 rounded-full hover:bg-secondary transition-colors shadow-md cursor-pointer text-sm font-semibold"
+                                            >
+                                                <ExternalLink size={16} />
+                                                {venue.tipo === 'live' ? 'Ver Transmisión' : 'Unirse a Videollamada'}
+                                            </a>
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">
+                                                Enlace disponible próximamente
+                                            </span>
+                                        )
+                                    ) : (
+                                        <button
+                                            onClick={() => openMap(venue)}
+                                            className="flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-full hover:bg-secondary transition-colors shadow-md cursor-pointer"
+                                        >
+                                            <MapPin size={18} />
+                                            Ver Mapa
+                                        </button>
+                                    )}
+                                </div>
+                            </motion.div>
+                        );
+                    })}
                 </div>
             </div>
 
