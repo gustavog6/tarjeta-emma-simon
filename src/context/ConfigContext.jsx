@@ -364,6 +364,14 @@ export const ConfigProvider = ({ children }) => {
         }
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-dvh-safe bg-background flex items-center justify-center">
+                <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
     return (
         <ConfigContext.Provider value={{ config, loading, saveConfig, reloadConfig: loadConfigFromDB }}>
             {children}

@@ -66,4 +66,4 @@ npm run dev
 
 ## 🎨 Personalización del Evento
 
-La configuración por defecto vive en `src/config/evento.js` (respaldo offline), y en producción se administra en vivo desde la pestaña **Configuración** del panel (`?admin=true`), guardándose en la tabla `configuracion` de Supabase.
+Toda la información del evento vive en **Supabase** y se administra desde la pestaña **Configuración** del panel (`?admin=true`). `src/config/evento.js` solo conserva la estructura neutra y los ajustes locales (`musica.src` y `galeria.habilitada`).
