@@ -1,8 +1,35 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Share2, Sparkles } from 'lucide-react';
+import { X, Download, Sparkles } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import { parseFecha } from '../utils/fechas';
+
+/**
+ * Dibuja texto centrado con salto de línea automático para evitar desbordes.
+ * Devuelve la coordenada Y final después de la última línea.
+ */
+function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+    if (!text) return y;
+    const words = String(text).split(/\s+/);
+    let line = '';
+    let currentY = y;
+
+    for (let i = 0; i < words.length; i++) {
+        const testLine = line ? `${line} ${words[i]}` : words[i];
+        const { width } = ctx.measureText(testLine);
+        if (width > maxWidth && line) {
+            ctx.fillText(line, x, currentY);
+            line = words[i];
+            currentY += lineHeight;
+        } else {
+            line = testLine;
+        }
+    }
+    if (line) {
+        ctx.fillText(line, x, currentY);
+    }
+    return currentY;
+}
 
 const StoryBannerModal = ({ isOpen, onClose }) => {
     const { config } = useConfig();
@@ -17,30 +44,30 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
     const dateFormatted = dateObj.toLocaleDateString('es-ES', {
         day: 'numeric',
         month: 'long',
-        year: 'numeric'
+        year: 'numeric',
     });
     const timeFormatted = dateObj.toLocaleTimeString('es-ES', {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
     });
 
     const handleDownloadStory = () => {
         setDownloading(true);
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvas) {
+            setDownloading(false);
+            return;
+        }
 
         const ctx = canvas.getContext('2d');
         const W = 1080;
         const H = 1920;
+        const MAX_TEXT_W = W - 220; // Margen seguro dentro del marco interior (80px por lado + 30px)
         canvas.width = W;
         canvas.height = H;
 
-        // Background
-        ctx.fillStyle = '#FCFCFA';
-        ctx.fillRect(0, 0, W, H);
-
-        // Gradient overlay
+        // Fondo degradado suave
         const grad = ctx.createLinearGradient(0, 0, 0, H);
         grad.addColorStop(0, '#FFFFFF');
         grad.addColorStop(0.5, '#F7FAF7');
@@ -48,7 +75,7 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
 
-        // Decorative borders
+        // Marco decorativo doble
         ctx.strokeStyle = '#7FB383';
         ctx.lineWidth = 4;
         ctx.strokeRect(60, 60, W - 120, H - 120);
@@ -57,65 +84,98 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
         ctx.lineWidth = 2;
         ctx.strokeRect(80, 80, W - 160, H - 160);
 
-        // Top Badge
+        // Badge superior
         ctx.textAlign = 'center';
         ctx.fillStyle = '#7FB383';
-        ctx.font = 'bold 34px sans-serif';
-        ctx.letterSpacing = '10px';
-        ctx.fillText('¡NOS CASAMOS!', W / 2, 380);
+        ctx.font = 'bold 34px Lato, sans-serif';
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '10px';
+        ctx.fillText('¡NOS CASAMOS!', W / 2, 360);
 
-        // Divider
+        // IMPORTANTE: resetear letterSpacing para que no se desborden los textos siguientes
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+
+        // Divisor
         ctx.beginPath();
-        ctx.moveTo(W / 2 - 120, 440);
-        ctx.lineTo(W / 2 + 120, 440);
+        ctx.moveTo(W / 2 - 120, 420);
+        ctx.lineTo(W / 2 + 120, 420);
         ctx.strokeStyle = 'rgba(127, 179, 131, 0.4)';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Names
-        ctx.font = 'italic 130px "Great Vibes", cursive, serif';
+        // Nombres de los novios
+        ctx.font = 'italic 132px "Great Vibes", cursive, serif';
         ctx.fillStyle = '#658F68';
-        ctx.fillText(`${novios.novio.nombre}`, W / 2, 680);
+        ctx.fillText(`${novios.novio.nombre}`, W / 2, 660, MAX_TEXT_W);
 
-        ctx.font = '48px sans-serif';
+        ctx.font = '46px Lato, sans-serif';
         ctx.fillStyle = '#7FB383';
-        ctx.fillText('&', W / 2, 780);
+        ctx.fillText('&', W / 2, 755);
 
-        ctx.font = 'italic 130px "Great Vibes", cursive, serif';
+        ctx.font = 'italic 132px "Great Vibes", cursive, serif';
         ctx.fillStyle = '#658F68';
-        ctx.fillText(`${novios.novia.nombre}`, W / 2, 920);
+        ctx.fillText(`${novios.novia.nombre}`, W / 2, 900, MAX_TEXT_W);
 
-        // Date container
+        // Contenedor de fecha
         ctx.fillStyle = '#FFFFFF';
         ctx.shadowColor = 'rgba(0,0,0,0.06)';
         ctx.shadowBlur = 30;
-        ctx.roundRect ? ctx.roundRect(W / 2 - 380, 1120, 760, 220, 40) : ctx.rect(W / 2 - 380, 1120, 760, 220);
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(W / 2 - 380, 1080, 760, 220, 40);
+        } else {
+            ctx.rect(W / 2 - 380, 1080, 760, 220);
+        }
         ctx.fill();
         ctx.shadowColor = 'transparent';
 
         ctx.fillStyle = '#7FB383';
-        ctx.font = 'bold 44px sans-serif';
-        ctx.fillText(dateFormatted.toUpperCase(), W / 2, 1210);
+        ctx.font = 'bold 42px Lato, sans-serif';
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+        ctx.fillText(dateFormatted.toUpperCase(), W / 2, 1175, 700);
 
         ctx.fillStyle = '#666666';
-        ctx.font = '36px sans-serif';
-        ctx.fillText(`${timeFormatted.toUpperCase()}`, W / 2, 1280);
+        ctx.font = '34px Lato, sans-serif';
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+        ctx.fillText(timeFormatted.toUpperCase(), W / 2, 1245, 700);
 
-        // Venue
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+
+        // Lugar y dirección (con ajuste automático de línea)
         ctx.fillStyle = '#444444';
-        ctx.font = 'bold 38px sans-serif';
-        ctx.fillText(`${venue.lugar || 'La Llovizna Hotel & Casino'}`, W / 2, 1460);
+        ctx.font = 'bold 38px Lato, sans-serif';
+        const afterLugarY = drawWrappedText(
+            ctx,
+            venue.lugar || 'Lugar del Evento',
+            W / 2,
+            1420,
+            MAX_TEXT_W,
+            48
+        );
 
-        ctx.fillStyle = '#888888';
-        ctx.font = '30px sans-serif';
-        ctx.fillText(`${venue.direccion || 'Puerto Ordaz, Venezuela'}`, W / 2, 1520);
+        ctx.fillStyle = '#777777';
+        ctx.font = '30px Lato, sans-serif';
+        drawWrappedText(
+            ctx,
+            venue.direccion || '',
+            W / 2,
+            afterLugarY + 54,
+            MAX_TEXT_W,
+            40
+        );
 
-        // Bottom text
+        // Frase inferior con margen seguro y salto de línea automático
         ctx.fillStyle = '#7FB383';
-        ctx.font = 'italic 40px sans-serif';
-        ctx.fillText('"Acompáñanos a celebrar nuestro gran día"', W / 2, 1720);
+        ctx.font = 'italic 36px Lato, sans-serif';
+        drawWrappedText(
+            ctx,
+            '"Acompáñanos a celebrar nuestro gran día"',
+            W / 2,
+            1685,
+            MAX_TEXT_W,
+            48
+        );
 
-        // Trigger download
+        // Descargar imagen
         const url = canvas.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = url;
@@ -170,11 +230,11 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
                         <div className="bg-white/90 p-2 rounded-xl shadow-xs w-full">
                             <p className="text-[10px] font-bold text-gray-700 uppercase">{dateFormatted}</p>
                             <p className="text-[9px] text-gray-500">{timeFormatted}</p>
-                            <p className="text-[8px] text-primary font-semibold mt-0.5">{venue.lugar}</p>
+                            <p className="text-[8px] text-primary font-semibold mt-0.5 truncate">{venue.lugar}</p>
                         </div>
 
-                        <p className="text-[8px] italic text-gray-400 pb-1">
-                            ¡Acompáñanos a celebrar!
+                        <p className="text-[8px] italic text-gray-400 pb-1 px-1">
+                            &ldquo;Acompáñanos a celebrar nuestro gran día&rdquo;
                         </p>
                     </div>
 

@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Camera, Image as ImageIcon, ZoomIn } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Camera, Image as ImageIcon, Images, X } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import { supabase } from '../lib/supabase';
 import PhotoUploadModal from './PhotoUploadModal';
 import PhotoViewerModal from './PhotoViewerModal';
+
+const PREVIEW_LIMIT = 6;
 
 const Gallery = ({ invitado }) => {
     const { config } = useConfig();
     const [photos, setPhotos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
-    const [selectedPhoto, setSelectedPhoto] = useState(null);
+    const [isAllModalOpen, setIsAllModalOpen] = useState(false);
+    const [viewerIndex, setViewerIndex] = useState(null); // null = cerrado
 
     const puedeSubir = Boolean(invitado?.puede_subir_fotos);
 
@@ -61,13 +64,16 @@ const Gallery = ({ invitado }) => {
 
     if (!config.galeria?.habilitada) return null;
 
+    const visiblePhotos = photos.slice(0, PREVIEW_LIMIT);
+    const extraCount = Math.max(0, photos.length - PREVIEW_LIMIT);
+
     return (
-        <section className="py-20 px-4 bg-secondary/5 relative overflow-hidden">
+        <section className="py-20 px-4 bg-background relative overflow-hidden">
             <div className="max-w-5xl mx-auto text-center relative z-10">
                 <div className="mb-10">
                     <h2 className="font-heading text-5xl text-primary mb-2">Galería de Recuerdos</h2>
                     <p className="text-gray-500 text-sm max-w-md mx-auto">
-                        Toca cualquier foto para verla y descargarla en alta calidad.
+                        Toca cualquier foto para recorrer la galería y descargar tus favoritas en alta calidad.
                     </p>
 
                     {puedeSubir && (
@@ -88,31 +94,55 @@ const Gallery = ({ invitado }) => {
                         Cargando fotos...
                     </div>
                 ) : photos.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {photos.map((photo, idx) => (
-                            <motion.div
-                                key={photo.id || idx}
-                                onClick={() => setSelectedPhoto(photo)}
-                                className="aspect-square rounded-2xl overflow-hidden shadow-md bg-white border border-primary/10 group relative cursor-pointer"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                whileInView={{ opacity: 1, scale: 1 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: idx * 0.05 }}
-                            >
-                                <img
-                                    src={photo.url}
-                                    alt="Foto de boda"
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                    {/* <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold">
-                                        <ZoomIn size={14} /> Ver y descargar
-                                    </div> */}
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
+                    <>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {visiblePhotos.map((photo, idx) => {
+                                const isLastWithExtra = idx === PREVIEW_LIMIT - 1 && extraCount > 0;
+                                return (
+                                    <motion.div
+                                        key={photo.id || idx}
+                                        onClick={() =>
+                                            isLastWithExtra ? setIsAllModalOpen(true) : setViewerIndex(idx)
+                                        }
+                                        className="aspect-square rounded-2xl overflow-hidden shadow-md bg-white border border-primary/10 group relative cursor-pointer"
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        whileInView={{ opacity: 1, scale: 1 }}
+                                        viewport={{ once: true }}
+                                        transition={{ delay: idx * 0.05 }}
+                                    >
+                                        <img
+                                            src={photo.url}
+                                            alt="Foto de boda"
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            loading="lazy"
+                                        />
+                                        {isLastWithExtra ? (
+                                            <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex flex-col items-center justify-center text-white p-3">
+                                                <span className="font-heading text-4xl leading-none">+{extraCount}</span>
+                                                <span className="text-xs uppercase tracking-widest mt-1 font-semibold">
+                                                    Ver todas
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        )}
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+
+                        {extraCount > 0 && (
+                            <div className="mt-8">
+                                <button
+                                    onClick={() => setIsAllModalOpen(true)}
+                                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-primary/30 text-primary hover:bg-primary hover:text-white transition-all text-sm font-semibold shadow-sm cursor-pointer bg-white"
+                                >
+                                    <Images size={17} />
+                                    Ver todas las fotos ({photos.length})
+                                </button>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="py-12 px-6 rounded-2xl border border-primary/20 bg-white/60 max-w-md mx-auto text-center">
                         <ImageIcon size={40} className="mx-auto text-primary/40 mb-3" />
@@ -124,6 +154,59 @@ const Gallery = ({ invitado }) => {
                 )}
             </div>
 
+            {/* Modal de Galería Completa cuando hay más de 6 fotos */}
+            <AnimatePresence>
+                {isAllModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsAllModalOpen(false)}
+                        />
+                        <motion.div
+                            className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden border-2 border-primary/20"
+                            initial={{ scale: 0.94, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.94, opacity: 0 }}
+                        >
+                            <div className="px-6 py-4 bg-background/95 border-b border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-heading text-3xl text-primary leading-tight">
+                                        Galería Completa
+                                    </h3>
+                                    <p className="text-xs text-gray-500">{photos.length} recuerdos compartidos</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsAllModalOpen(false)}
+                                    className="p-2 hover:bg-black/5 rounded-full text-gray-500 cursor-pointer"
+                                    aria-label="Cerrar galería"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-5 overflow-y-auto custom-scrollbar grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                {photos.map((photo, idx) => (
+                                    <div
+                                        key={photo.id || idx}
+                                        onClick={() => setViewerIndex(idx)}
+                                        className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-primary/10 cursor-pointer group"
+                                    >
+                                        <img
+                                            src={photo.url}
+                                            alt="Recuerdo"
+                                            loading="lazy"
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             <PhotoUploadModal
                 isOpen={isUploadOpen}
                 onClose={() => setIsUploadOpen(false)}
@@ -132,9 +215,11 @@ const Gallery = ({ invitado }) => {
             />
 
             <PhotoViewerModal
-                isOpen={Boolean(selectedPhoto)}
-                onClose={() => setSelectedPhoto(null)}
-                photo={selectedPhoto}
+                isOpen={viewerIndex !== null}
+                onClose={() => setViewerIndex(null)}
+                photos={photos}
+                currentIndex={viewerIndex ?? 0}
+                onChangeIndex={setViewerIndex}
             />
         </section>
     );
