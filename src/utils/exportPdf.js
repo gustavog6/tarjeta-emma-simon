@@ -1,55 +1,54 @@
 /**
  * src/utils/exportPdf.js
- * Genera un reporte PDF listo para imprimir (lista de confirmaciones + resumen de catering).
+ * Generates a print-ready PDF report (confirmed attendees + catering summary).
  */
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { labelOf, nombreCompletoDe } from './menu';
-import { grupoLabel } from './grupos';
+import { getMenuItemLabel, getAttendeeFullName } from './menuUtils';
+import { getGroupLabel } from './groupUtils';
+import { formatHostsNames, getEventSlug } from '../config/eventPresets';
 
-export function exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilter = 'todos') {
+export function exportRsvpToPdf(groupedGuests, config, groupFilter = 'all') {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    const platos = config?.menu?.platosFuertes || [];
-    const contornos = config?.menu?.contornos || [];
-    const grupos = config?.grupos || [];
-    const nombreNovia = config?.novios?.novia?.nombre || 'Novia';
-    const nombreNovio = config?.novios?.novio?.nombre || 'Novio';
+    const mainCourses = config?.menu?.mainCourses || [];
+    const sides = config?.menu?.sides || [];
+    const groups = config?.groups || [];
+    const hostsTitle = formatHostsNames(config?.hosts);
 
-    const totalPases = titularesAgrupados.reduce(
-        (acc, g) => acc + 1 + Number(g.titular.slots_totales ?? g.titular.slots ?? 0),
+    const totalPasses = groupedGuests.reduce(
+        (acc, g) => acc + 1 + Number(g.guest.extra_passes ?? 0),
         0
     );
-    const totalConfirmados = titularesAgrupados.reduce((acc, g) => acc + g.asistentes.length, 0);
+    const totalConfirmed = groupedGuests.reduce((acc, g) => acc + g.attendees.length, 0);
 
-    // Encabezado
     doc.setFontSize(16);
     doc.setTextColor(65, 100, 68);
-    doc.text(`Reporte de Confirmaciones — ${nombreNovio} & ${nombreNovia}`, 40, 40);
+    doc.text(`Reporte de Confirmaciones — ${hostsTitle}`, 40, 40);
 
     doc.setFontSize(9);
     doc.setTextColor(100);
-    const filtroTexto =
-        grupoFilter === 'todos' ? 'Todos los grupos' : grupoLabel(grupos, grupoFilter);
+    const filterText =
+        groupFilter === 'all' ? 'Todos los grupos' : getGroupLabel(groups, groupFilter);
     doc.text(
-        `Generado: ${new Date().toLocaleString('es-ES')}  |  Filtro: ${filtroTexto}  |  Familias: ${titularesAgrupados.length}  |  Pases totales: ${totalPases}  |  Confirmados: ${totalConfirmados}`,
+        `Generado: ${new Date().toLocaleString('es-ES')}  |  Filtro: ${filterText}  |  Invitaciones: ${groupedGuests.length}  |  Pases asignados: ${totalPasses}  |  Confirmados: ${totalConfirmed}`,
         40,
         56
     );
 
     const body = [];
-    const conteoPlatos = {};
-    const conteoContornos = {};
+    const mainCourseCounts = {};
+    const sideCounts = {};
 
-    titularesAgrupados.forEach(({ titular, asistentes }) => {
-        const grupoTxt = grupoLabel(grupos, titular.grupo);
-        const titularNombre = `${titular.nombre} ${titular.apellido}`.trim();
-        const totalCap = 1 + Number(titular.slots_totales ?? titular.slots ?? 0);
+    groupedGuests.forEach(({ guest, attendees }) => {
+        const groupTxt = getGroupLabel(groups, guest.group_id);
+        const primaryName = `${guest.first_name} ${guest.last_name}`.trim();
+        const totalCap = 1 + Number(guest.extra_passes ?? 0);
 
-        if (asistentes.length === 0) {
+        if (attendees.length === 0) {
             body.push([
-                grupoTxt,
-                titularNombre,
-                titular.telefono || '—',
+                groupTxt,
+                primaryName,
+                guest.phone || '—',
                 `0 / ${totalCap}`,
                 'Pendiente',
                 '(Sin confirmar)',
@@ -57,26 +56,26 @@ export function exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilte
                 '—',
             ]);
         } else {
-            asistentes.forEach((a, idx) => {
-                const platoLabel = labelOf(platos, a.plato_fuerte);
-                const contornosLabel =
-                    (a.contornos || []).map((id) => labelOf(contornos, id)).join(', ') || '—';
+            attendees.forEach((a, idx) => {
+                const courseLabel = getMenuItemLabel(mainCourses, a.main_course_id);
+                const sidesLabel =
+                    (a.side_ids || []).map((id) => getMenuItemLabel(sides, id)).join(', ') || '—';
 
-                conteoPlatos[platoLabel] = (conteoPlatos[platoLabel] || 0) + 1;
-                (a.contornos || []).forEach((id) => {
-                    const cLabel = labelOf(contornos, id);
-                    conteoContornos[cLabel] = (conteoContornos[cLabel] || 0) + 1;
+                mainCourseCounts[courseLabel] = (mainCourseCounts[courseLabel] || 0) + 1;
+                (a.side_ids || []).forEach((id) => {
+                    const sLabel = getMenuItemLabel(sides, id);
+                    sideCounts[sLabel] = (sideCounts[sLabel] || 0) + 1;
                 });
 
                 body.push([
-                    idx === 0 ? grupoTxt : '',
-                    idx === 0 ? titularNombre : '',
-                    idx === 0 ? titular.telefono || '—' : '',
-                    idx === 0 ? `${asistentes.length} / ${totalCap}` : '',
-                    a.es_titular ? 'Titular' : 'Acompañante',
-                    nombreCompletoDe(a),
-                    platoLabel,
-                    contornosLabel,
+                    idx === 0 ? groupTxt : '',
+                    idx === 0 ? primaryName : '',
+                    idx === 0 ? guest.phone || '—' : '',
+                    idx === 0 ? `${attendees.length} / ${totalCap}` : '',
+                    a.is_primary ? 'Titular' : 'Acompañante',
+                    getAttendeeFullName(a),
+                    courseLabel,
+                    sidesLabel,
                 ]);
             });
         }
@@ -91,24 +90,24 @@ export function exportConfirmacionesToPDF(titularesAgrupados, config, grupoFilte
         alternateRowStyles: { fillColor: [247, 250, 247] },
     });
 
-    // Tabla de resumen para catering al final
     const finalY = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 24 : 70;
-    const resumenBody = [
-        ...Object.entries(conteoPlatos).map(([k, v]) => ['Plato Fuerte', k, String(v)]),
-        ...Object.entries(conteoContornos).map(([k, v]) => ['Contorno', k, String(v)]),
+    const summaryBody = [
+        ...Object.entries(mainCourseCounts).map(([k, v]) => ['Plato Fuerte', k, String(v)]),
+        ...Object.entries(sideCounts).map(([k, v]) => ['Contorno', k, String(v)]),
     ];
 
-    if (resumenBody.length > 0) {
+    if (summaryBody.length > 0) {
         autoTable(doc, {
             startY: finalY,
             head: [['Categoría', 'Opción de Menú', 'Cantidad']],
-            body: resumenBody,
+            body: summaryBody,
             tableWidth: 360,
             styles: { fontSize: 8, cellPadding: 4 },
             headStyles: { fillColor: [75, 85, 99], textColor: 255, fontStyle: 'bold' },
         });
     }
 
-    const fecha = new Date().toISOString().slice(0, 10);
-    doc.save(`Confirmaciones_Boda_${fecha}.pdf`);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const slug = getEventSlug(config?.eventType);
+    doc.save(`Confirmaciones_${slug}_${dateStr}.pdf`);
 }

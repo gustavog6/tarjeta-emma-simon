@@ -1,12 +1,11 @@
 /**
  * src/utils/exportExcel.js
- * Genera un reporte Excel (.xlsx) estilizado con ExcelJS en armonía visual con el reporte PDF:
- *   • Hoja 1: Confirmaciones (título, métricas, encabezados verde salvia, filas alternas, autofiltro, fila de totales)
- *   • Hoja 2: Resumen Catering (resumen general, desglose por grupo, platos fuertes y contornos con fórmulas =SUM)
+ * Generates a styled Excel (.xlsx) report with ExcelJS matching the PDF report layout.
  */
 import ExcelJS from 'exceljs';
-import { labelOf, nombreCompletoDe } from './menu';
-import { grupoLabel } from './grupos';
+import { getMenuItemLabel, getAttendeeFullName } from './menuUtils';
+import { getGroupLabel } from './groupUtils';
+import { formatHostsNames, getEventSlug } from '../config/eventPresets';
 
 const COLORS = {
     titleText: 'FF416444',
@@ -52,53 +51,48 @@ function styleTotalRow(row) {
     });
 }
 
-export async function exportConfirmacionesToXLSX(titularesAgrupados, config, grupoFilter = 'todos') {
+export async function exportRsvpToXlsx(groupedGuests, config, groupFilter = 'all') {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Invitación Digital';
     wb.created = new Date();
 
-    const platos = config?.menu?.platosFuertes || [];
-    const contornos = config?.menu?.contornos || [];
-    const grupos = config?.grupos || [];
-    const nombreNovia = config?.novios?.novia?.nombre || 'Novia';
-    const nombreNovio = config?.novios?.novio?.nombre || 'Novio';
-    const pareja = `${nombreNovio} & ${nombreNovia}`;
+    const mainCourses = config?.menu?.mainCourses || [];
+    const sides = config?.menu?.sides || [];
+    const groups = config?.groups || [];
+    const hostsTitle = formatHostsNames(config?.hosts);
 
-    const totalPases = titularesAgrupados.reduce(
-        (acc, g) => acc + 1 + Number(g.titular.slots_totales ?? g.titular.slots ?? 0),
+    const totalPasses = groupedGuests.reduce(
+        (acc, g) => acc + 1 + Number(g.guest.extra_passes ?? 0),
         0
     );
-    const totalConfirmados = titularesAgrupados.reduce((acc, g) => acc + g.asistentes.length, 0);
-    const filtroTexto =
-        grupoFilter === 'todos' ? 'Todos los grupos' : grupoLabel(grupos, grupoFilter);
+    const totalConfirmed = groupedGuests.reduce((acc, g) => acc + g.attendees.length, 0);
+    const filterText =
+        groupFilter === 'all' ? 'Todos los grupos' : getGroupLabel(groups, groupFilter);
 
     // ══════════════════════════════════════════════════════════════════
-    // HOJA 1: CONFIRMACIONES
+    // SHEET 1: CONFIRMACIONES
     // ══════════════════════════════════════════════════════════════════
     const ws = wb.addWorksheet('Confirmaciones', {
         views: [{ state: 'frozen', ySplit: 4 }],
         pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     });
 
-    // Título (Fila 1)
     ws.mergeCells('A1:K1');
     const titleCell = ws.getCell('A1');
-    titleCell.value = `Reporte de Confirmaciones — ${pareja}`;
+    titleCell.value = `Reporte de Confirmaciones — ${hostsTitle}`;
     titleCell.font = { name: 'Calibri', size: 15, bold: true, color: { argb: COLORS.titleText } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(1).height = 28;
 
-    // Metadatos (Fila 2)
     ws.mergeCells('A2:K2');
     const metaCell = ws.getCell('A2');
-    metaCell.value = `Generado: ${new Date().toLocaleString('es-ES')}  |  Filtro: ${filtroTexto}  |  Familias: ${titularesAgrupados.length}  |  Pases asignados: ${totalPases}  |  Confirmados: ${totalConfirmados}`;
+    metaCell.value = `Generado: ${new Date().toLocaleString('es-ES')}  |  Filtro: ${filterText}  |  Invitaciones: ${groupedGuests.length}  |  Pases asignados: ${totalPasses}  |  Confirmados: ${totalConfirmed}`;
     metaCell.font = { name: 'Calibri', size: 9.5, color: { argb: COLORS.mutedText } };
     metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(2).height = 18;
 
     ws.getRow(3).height = 8;
 
-    // Encabezados (Fila 4)
     const headers = [
         'Grupo',
         'Titular',
@@ -118,78 +112,77 @@ export async function exportConfirmacionesToXLSX(titularesAgrupados, config, gru
     headerRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
     headerRow.getCell(10).alignment = { vertical: 'middle', horizontal: 'center' };
 
-    // Anchos de columna
     ws.columns = [
-        { width: 16 }, // Grupo
-        { width: 22 }, // Titular
-        { width: 17 }, // Teléfono
-        { width: 24 }, // Email
-        { width: 10 }, // Cupo
-        { width: 15 }, // Rol
-        { width: 24 }, // Asistente
-        { width: 28 }, // Plato Fuerte
-        { width: 30 }, // Contornos
-        { width: 10 }, // Fotos
-        { width: 20 }, // Fecha
+        { width: 16 },
+        { width: 22 },
+        { width: 17 },
+        { width: 24 },
+        { width: 10 },
+        { width: 15 },
+        { width: 24 },
+        { width: 28 },
+        { width: 30 },
+        { width: 10 },
+        { width: 20 },
     ];
 
-    const conteoPlatos = {};
-    const conteoContornos = {};
-    const conteoGrupos = {};
+    const mainCourseCounts = {};
+    const sideCounts = {};
+    const groupCounts = {};
     let rowIdx = 5;
-    let familyToggle = false;
+    let zebraToggle = false;
 
-    titularesAgrupados.forEach(({ titular, asistentes, fotosCount }) => {
-        const slotsVal = Number(titular.slots_totales ?? titular.slots ?? 0);
-        const totalCap = 1 + slotsVal;
-        const grupoTxt = grupoLabel(grupos, titular.grupo);
-        const titularNombre = `${titular.nombre} ${titular.apellido}`.trim();
-        familyToggle = !familyToggle;
+    groupedGuests.forEach(({ guest, attendees, photosCount }) => {
+        const extraVal = Number(guest.extra_passes ?? 0);
+        const totalCap = 1 + extraVal;
+        const groupTxt = getGroupLabel(groups, guest.group_id);
+        const primaryName = `${guest.first_name} ${guest.last_name}`.trim();
+        zebraToggle = !zebraToggle;
 
-        conteoGrupos[grupoTxt] = (conteoGrupos[grupoTxt] || 0) + asistentes.length;
+        groupCounts[groupTxt] = (groupCounts[groupTxt] || 0) + attendees.length;
 
-        const lista = asistentes.length > 0 ? asistentes : [null];
+        const list = attendees.length > 0 ? attendees : [null];
 
-        lista.forEach((a, idx) => {
+        list.forEach((a, idx) => {
             const isFirst = idx === 0;
-            const platoTxt = a ? labelOf(platos, a.plato_fuerte) : '—';
-            const contornosTxt = a
-                ? (a.contornos || []).map((id) => labelOf(contornos, id)).join(', ') || '—'
+            const courseTxt = a ? getMenuItemLabel(mainCourses, a.main_course_id) : '—';
+            const sidesTxt = a
+                ? (a.side_ids || []).map((id) => getMenuItemLabel(sides, id)).join(', ') || '—'
                 : '—';
 
             if (a) {
-                conteoPlatos[platoTxt] = (conteoPlatos[platoTxt] || 0) + 1;
-                (a.contornos || []).forEach((id) => {
-                    const cLabel = labelOf(contornos, id);
-                    conteoContornos[cLabel] = (conteoContornos[cLabel] || 0) + 1;
+                mainCourseCounts[courseTxt] = (mainCourseCounts[courseTxt] || 0) + 1;
+                (a.side_ids || []).forEach((id) => {
+                    const sLabel = getMenuItemLabel(sides, id);
+                    sideCounts[sLabel] = (sideCounts[sLabel] || 0) + 1;
                 });
             }
 
             const row = ws.getRow(rowIdx);
             row.values = [
-                isFirst ? grupoTxt : '',
-                isFirst ? titularNombre : '',
-                isFirst ? titular.telefono || '—' : '',
-                isFirst ? titular.email || '—' : '',
-                isFirst ? `${asistentes.length} / ${totalCap}` : '',
-                a ? (a.es_titular ? 'Titular' : 'Acompañante') : 'Pendiente',
-                a ? (a.es_titular ? nombreCompletoDe(a) : `↳ ${nombreCompletoDe(a)}`) : '(Sin confirmar)',
-                platoTxt,
-                contornosTxt,
-                isFirst ? (fotosCount > 0 ? fotosCount : titular.puede_subir_fotos ? 'Sí (0)' : 'No') : '',
+                isFirst ? groupTxt : '',
+                isFirst ? primaryName : '',
+                isFirst ? guest.phone || '—' : '',
+                isFirst ? guest.email || '—' : '',
+                isFirst ? `${attendees.length} / ${totalCap}` : '',
+                a ? (a.is_primary ? 'Titular' : 'Acompañante') : 'Pendiente',
+                a ? (a.is_primary ? getAttendeeFullName(a) : `↳ ${getAttendeeFullName(a)}`) : '(Sin confirmar)',
+                courseTxt,
+                sidesTxt,
+                isFirst ? (photosCount > 0 ? photosCount : guest.can_upload_photos ? 'Sí (0)' : 'No') : '',
                 a?.created_at ? new Date(a.created_at).toLocaleString('es-ES') : '',
             ];
             row.height = 20;
 
             row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                if (familyToggle) {
+                if (zebraToggle) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.zebraBg } };
                 }
                 cell.font = {
                     name: 'Calibri',
                     size: 9.5,
-                    bold: (colNumber === 2 && isFirst) || (colNumber === 7 && Boolean(a?.es_titular)),
-                    color: { argb: colNumber === 6 && !a?.es_titular ? COLORS.mutedText : COLORS.darkText },
+                    bold: (colNumber === 2 && isFirst) || (colNumber === 7 && Boolean(a?.is_primary)),
+                    color: { argb: colNumber === 6 && !a?.is_primary ? COLORS.mutedText : COLORS.darkText },
                 };
                 cell.alignment = {
                     vertical: 'middle',
@@ -203,16 +196,15 @@ export async function exportConfirmacionesToXLSX(titularesAgrupados, config, gru
         });
     });
 
-    // Fila de totales al final
     const totalRow = ws.getRow(rowIdx);
     totalRow.values = [
         'TOTAL',
-        `${titularesAgrupados.length} familia(s)`,
+        `${groupedGuests.length} invitación(es)`,
         '',
         '',
-        `${totalConfirmados} / ${totalPases}`,
+        `${totalConfirmed} / ${totalPasses}`,
         '',
-        `${totalConfirmados} asistente(s) confirmado(s)`,
+        `${totalConfirmed} asistente(s) confirmado(s)`,
         '',
         '',
         '',
@@ -224,7 +216,7 @@ export async function exportConfirmacionesToXLSX(titularesAgrupados, config, gru
     ws.autoFilter = { from: 'A4', to: 'K4' };
 
     // ══════════════════════════════════════════════════════════════════
-    // HOJA 2: RESUMEN CATERING
+    // SHEET 2: RESUMEN CATERING
     // ══════════════════════════════════════════════════════════════════
     const wsRes = wb.addWorksheet('Resumen Catering', {
         pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
@@ -238,29 +230,28 @@ export async function exportConfirmacionesToXLSX(titularesAgrupados, config, gru
 
     wsRes.mergeCells('A1:C1');
     const resTitle = wsRes.getCell('A1');
-    resTitle.value = `Resumen para Catering — ${pareja}`;
+    resTitle.value = `Resumen para Catering — ${hostsTitle}`;
     resTitle.font = { name: 'Calibri', size: 15, bold: true, color: { argb: COLORS.titleText } };
     wsRes.getRow(1).height = 28;
 
     wsRes.mergeCells('A2:C2');
     const resMeta = wsRes.getCell('A2');
-    resMeta.value = `Filtro: ${filtroTexto}  |  Generado: ${new Date().toLocaleString('es-ES')}`;
+    resMeta.value = `Filtro: ${filterText}  |  Generado: ${new Date().toLocaleString('es-ES')}`;
     resMeta.font = { name: 'Calibri', size: 9.5, color: { argb: COLORS.mutedText } };
     wsRes.getRow(2).height = 18;
 
     let r = 4;
 
-    // Bloque 1: Resumen General + Desglose por Grupo
     const hGen = wsRes.getRow(r++);
     hGen.values = ['Resumen General', 'Detalle', 'Cantidad'];
     styleHeaderRow(hGen, COLORS.headerBg);
     hGen.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
 
     const generalRows = [
-        ['Familias confirmadas', 'Titulares con al menos 1 asistente', titularesAgrupados.length],
-        ['Pases asignados', 'Capacidad total de las familias listadas', totalPases],
-        ['Personas confirmadas', 'Total asistentes a servir', totalConfirmados],
-        ...Object.entries(conteoGrupos).map(([grp, cnt]) => ['Por grupo', grp, cnt]),
+        ['Invitaciones confirmadas', 'Titulares con al menos 1 asistente', groupedGuests.length],
+        ['Pases asignados', 'Capacidad total de las invitaciones listadas', totalPasses],
+        ['Personas confirmadas', 'Total asistentes a servir', totalConfirmed],
+        ...Object.entries(groupCounts).map(([grp, cnt]) => ['Por grupo', grp, cnt]),
     ];
 
     generalRows.forEach((vals, i) => {
@@ -279,18 +270,17 @@ export async function exportConfirmacionesToXLSX(titularesAgrupados, config, gru
 
     r += 1;
 
-    // Helper para bloques de Platos y Contornos con fórmula =SUM
-    const addMenuBlock = (titulo, entradas) => {
-        if (entradas.length === 0) return;
+    const addMenuBlock = (title, entries) => {
+        if (entries.length === 0) return;
         const hRow = wsRes.getRow(r++);
-        hRow.values = ['Categoría', titulo, 'Cantidad'];
+        hRow.values = ['Categoría', title, 'Cantidad'];
         styleHeaderRow(hRow, COLORS.subHeaderBg);
         hRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
 
         const startRow = r;
-        entradas.forEach(([nombre, cantidad], i) => {
+        entries.forEach(([name, count], i) => {
             const row = wsRes.getRow(r++);
-            row.values = [titulo, nombre, cantidad];
+            row.values = [title, name, count];
             row.height = 20;
             row.eachCell((cell, col) => {
                 if (i % 2 === 1) {
@@ -304,16 +294,15 @@ export async function exportConfirmacionesToXLSX(titularesAgrupados, config, gru
         const endRow = r - 1;
 
         const tRow = wsRes.getRow(r++);
-        tRow.values = ['', `Total ${titulo}`, { formula: `SUM(C${startRow}:C${endRow})` }];
+        tRow.values = ['', `Total ${title}`, { formula: `SUM(C${startRow}:C${endRow})` }];
         styleTotalRow(tRow);
         tRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
         r += 1;
     };
 
-    addMenuBlock('Platos Fuertes', Object.entries(conteoPlatos));
-    addMenuBlock('Contornos / Guarniciones', Object.entries(conteoContornos));
+    addMenuBlock('Platos Fuertes', Object.entries(mainCourseCounts));
+    addMenuBlock('Contornos / Guarniciones', Object.entries(sideCounts));
 
-    // Descargar archivo .xlsx
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -321,7 +310,8 @@ export async function exportConfirmacionesToXLSX(titularesAgrupados, config, gru
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Confirmaciones_Boda_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const slug = getEventSlug(config?.eventType);
+    a.download = `Confirmaciones_${slug}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -4,70 +4,84 @@ import {
     X, UtensilsCrossed, Check, ChevronRight, ChevronLeft,
     MessageCircle, Users, Plus, Trash2, Heart, AlertCircle, UserPlus
 } from 'lucide-react';
-import { useConfig } from '../context/ConfigContext';
+import { useEventConfig } from '../context/EventConfigContext';
 import { supabase } from '../lib/supabase';
-import { parseFecha } from '../utils/fechas';
-import { friendlyError } from '../utils/errores';
-import { findGrupo, grupoLabel, grupoColorStyle } from '../utils/grupos';
-import { INVITATION_LIMITS, limitList } from '../config/invitationLimits';
-import vestido from '../assets/vestido-verde.png';
-import camisa from '../assets/camisa-verde.png';
+import { parseDate } from '../utils/dateUtils';
+import { formatDbError } from '../utils/errorMessages';
+import { findGroup, getGroupLabel, getGroupColorStyle } from '../utils/groupUtils';
+import { ICON_MAP } from '../utils/iconRegistry';
+import { EVENT_LIMITS, limitList } from '../config/eventLimits';
+import { formatHostsNames, interpolateTemplate } from '../config/eventPresets';
+import attireOptionA from '../assets/attire-option-a.png';
+import attireOptionB from '../assets/attire-option-b.png';
 
-const createEmptyGuest = (nombre = '', apellido = '', esTitular = false) => ({
-    nombre,
-    apellido,
-    esTitular,
-    platoFuerte: null,
-    contornos: [],
-    regalo: null,
+const createEmptyAttendee = (firstName = '', lastName = '', isPrimary = false) => ({
+    firstName,
+    lastName,
+    isPrimary,
+    mainCourse: null,
+    sides: [],
+    giftOption: null,
 });
 
-const fullNameOf = (g) => `${g.nombre || ''} ${g.apellido || ''}`.trim();
+const fullNameOf = (a) => `${a.firstName || ''} ${a.lastName || ''}`.trim();
 
-const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onConfirmed }) => {
-    const { config } = useConfig();
-    const { novios, menu, fecha, textos } = config;
-    const grupos = limitList(config.grupos, INVITATION_LIMITS.grupos.max);
-    const platosList = limitList(menu?.platosFuertes, INVITATION_LIMITS.menu.platosMax);
-    const contornosList = limitList(menu?.contornos, INVITATION_LIMITS.menu.contornosMax);
-    const rawSlots = Number(invitado?.slots_totales ?? invitado?.slots ?? 0);
-    const maxSlots = 1 + rawSlots;
-    const yaConfirmados = confirmacionesPrevias.length;
-    const yaTieneTitular = confirmacionesPrevias.some((c) => c.es_titular);
-    const cuposRestantes = Math.max(0, maxSlots - yaConfirmados);
-    const defaultGrupo = invitado?.grupo || grupos[0]?.id || null;
+const renderGroupIcon = (iconKey, altText) => {
+    if (iconKey === 'dress') {
+        return <img src={attireOptionA} alt={altText} className="w-9 h-9 object-contain" />;
+    }
+    if (iconKey === 'shirt') {
+        return <img src={attireOptionB} alt={altText} className="w-9 h-9 object-contain" />;
+    }
+    const IconComp = ICON_MAP[iconKey] || Users;
+    return <IconComp size={26} />;
+};
 
-    const buildInitialGuests = () =>
-        yaTieneTitular
-            ? [createEmptyGuest('', '', false)]
-            : [createEmptyGuest(invitado?.nombre || '', invitado?.apellido || '', true)];
+const RsvpModal = ({ isOpen, onClose, guest, existingAttendees = [], onConfirmed }) => {
+    const { config } = useEventConfig();
+    const { hosts, menu, eventDate, copy } = config;
+    const groups = limitList(config.groups, EVENT_LIMITS.groups.max);
+    const mainCoursesList = limitList(menu?.mainCourses, EVENT_LIMITS.menu.mainCoursesMax);
+    const sidesList = limitList(menu?.sides, EVENT_LIMITS.menu.sidesMax);
 
-    const [step, setStep] = useState(yaTieneTitular ? 2 : 1); // 1 | 2 | 2.5 (aviso cupos) | 3 | 4
-    const [invitadoDe, setInvitadoDe] = useState(defaultGrupo);
-    const [guests, setGuests] = useState(buildInitialGuests);
-    const [currentGuestIndex, setCurrentGuestIndex] = useState(0);
-    const [menuStep, setMenuStep] = useState('platoFuerte');
+    const extraPasses = Number(guest?.extra_passes ?? 0);
+    const maxPasses = 1 + extraPasses;
+    const alreadyConfirmed = existingAttendees.length;
+    const alreadyHasPrimary = existingAttendees.some((a) => a.is_primary);
+    const remainingPasses = Math.max(0, maxPasses - alreadyConfirmed);
+    const defaultGroupId = guest?.group_id || groups[0]?.id || null;
+    const skipGroupStep = alreadyHasPrimary || groups.length <= 1;
+
+    const buildInitialAttendees = () =>
+        alreadyHasPrimary
+            ? [createEmptyAttendee('', '', false)]
+            : [createEmptyAttendee(guest?.first_name || '', guest?.last_name || '', true)];
+
+    const [step, setStep] = useState(skipGroupStep ? 2 : 1);
+    const [selectedGroupId, setSelectedGroupId] = useState(defaultGroupId);
+    const [attendees, setAttendees] = useState(buildInitialAttendees);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [menuStep, setMenuStep] = useState('mainCourse');
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState(null);
 
-    // Sincronizar estado cada vez que se abre el modal
     useEffect(() => {
         if (isOpen) {
-            setStep(yaTieneTitular ? 2 : 1);
-            setGuests(buildInitialGuests());
-            setCurrentGuestIndex(0);
-            setMenuStep('platoFuerte');
-            setInvitadoDe(defaultGrupo);
+            setStep(skipGroupStep ? 2 : 1);
+            setAttendees(buildInitialAttendees());
+            setCurrentIndex(0);
+            setMenuStep('mainCourse');
+            setSelectedGroupId(defaultGroupId);
             setSubmitting(false);
             setSubmitError(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, yaTieneTitular, yaConfirmados]);
+    }, [isOpen, alreadyHasPrimary, alreadyConfirmed, groups.length]);
 
     if (!isOpen) return null;
 
-    const currentGuest = guests[currentGuestIndex] || guests[0];
-    const maxContornos = menu?.maxContornos ?? 2;
+    const currentAttendee = attendees[currentIndex] || attendees[0];
+    const maxSides = menu?.maxSides ?? 2;
 
     const handleClose = () => {
         setSubmitting(false);
@@ -75,117 +89,121 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
         onClose();
     };
 
-    const addGuest = () => {
-        if (guests.length < cuposRestantes) {
-            setGuests([...guests, createEmptyGuest()]);
+    const addAttendee = () => {
+        if (attendees.length < remainingPasses) {
+            setAttendees([...attendees, createEmptyAttendee()]);
         }
     };
 
-    const removeGuest = (index) => {
-        // Si es primera vez (titular en índice 0), no permitir borrar índice 0
-        if (!yaTieneTitular && index === 0) return;
-        if (guests.length > 1) {
-            const newGuests = guests.filter((_, i) => i !== index);
-            setGuests(newGuests);
-            if (currentGuestIndex >= newGuests.length) {
-                setCurrentGuestIndex(newGuests.length - 1);
+    const removeAttendee = (index) => {
+        if (!alreadyHasPrimary && index === 0) return;
+        if (attendees.length > 1) {
+            const next = attendees.filter((_, i) => i !== index);
+            setAttendees(next);
+            if (currentIndex >= next.length) {
+                setCurrentIndex(next.length - 1);
             }
         }
     };
 
-    const updateGuestField = (index, field, value) => {
-        const newGuests = [...guests];
-        newGuests[index] = { ...newGuests[index], [field]: value };
-        setGuests(newGuests);
+    const updateAttendeeField = (index, field, value) => {
+        const next = [...attendees];
+        next[index] = { ...next[index], [field]: value };
+        setAttendees(next);
     };
 
-    const updateCurrentGuest = (updates) => {
-        const newGuests = [...guests];
-        newGuests[currentGuestIndex] = { ...currentGuest, ...updates };
-        setGuests(newGuests);
+    const updateCurrentAttendee = (updates) => {
+        const next = [...attendees];
+        next[currentIndex] = { ...currentAttendee, ...updates };
+        setAttendees(next);
     };
 
-    const toggleContorno = (contorno) => {
-        const currentContornos = currentGuest.contornos;
-        if (currentContornos.find((c) => c.id === contorno.id)) {
-            updateCurrentGuest({ contornos: currentContornos.filter((c) => c.id !== contorno.id) });
-        } else if (currentContornos.length < maxContornos) {
-            updateCurrentGuest({ contornos: [...currentContornos, contorno] });
+    const toggleSide = (side) => {
+        const currentSides = currentAttendee.sides;
+        if (currentSides.find((s) => s.id === side.id)) {
+            updateCurrentAttendee({ sides: currentSides.filter((s) => s.id !== side.id) });
+        } else if (currentSides.length < maxSides) {
+            updateCurrentAttendee({ sides: [...currentSides, side] });
         }
     };
 
-    const allGuestsHaveNames = () =>
-        guests.every((g) => g.nombre.trim().length > 0 && g.apellido.trim().length > 0);
+    const allAttendeesHaveNames = () =>
+        attendees.every((a) => a.firstName.trim().length > 0 && a.lastName.trim().length > 0);
 
     const handleContinueFromStep2 = () => {
-        // Si todavía tiene pases sin usar, mostrar el paso de aviso antes de pasar al menú
-        if (guests.length < cuposRestantes) {
+        if (attendees.length < remainingPasses) {
             setStep(2.5);
         } else {
             setStep(3);
-            setCurrentGuestIndex(0);
-            setMenuStep('platoFuerte');
+            setCurrentIndex(0);
+            setMenuStep('mainCourse');
         }
     };
 
-    const goToNextGuest = () => {
-        if (currentGuestIndex < guests.length - 1) {
-            setCurrentGuestIndex(currentGuestIndex + 1);
-            setMenuStep('platoFuerte');
+    const goToNextAttendee = () => {
+        if (currentIndex < attendees.length - 1) {
+            setCurrentIndex(currentIndex + 1);
+            setMenuStep('mainCourse');
         } else {
             setSubmitError(null);
             setStep(4);
         }
     };
 
-    const goToPrevGuest = () => {
-        if (currentGuestIndex > 0) {
-            setCurrentGuestIndex(currentGuestIndex - 1);
-            setMenuStep('platoFuerte');
+    const goToPrevAttendee = () => {
+        if (currentIndex > 0) {
+            setCurrentIndex(currentIndex - 1);
+            setMenuStep('mainCourse');
         } else {
             setStep(2);
         }
     };
 
     const generateWhatsAppLink = () => {
-        const novia = novios.novia;
-        const novio = novios.novio;
-        const grupoObj = findGrupo(grupos, invitadoDe);
+        const groupObj = findGroup(groups, selectedGroupId);
         const phone =
-            grupoObj?.whatsapp ||
-            (invitadoDe === 'novia' ? novia.whatsapp : novio.whatsapp) ||
-            novia.whatsapp ||
-            novio.whatsapp ||
+            groupObj?.contactPhone ||
+            hosts?.primary?.phone ||
+            hosts?.secondary?.phone ||
             '';
 
-        let mensaje = yaTieneTitular
-            ? `¡Hola! Agrego acompañante(s) a mi confirmación para la boda de ${novio.nombre} & ${novia.nombre} 💍\n\n`
-            : `¡Hola! Confirmo asistencia a la boda de ${novio.nombre} & ${novia.nombre} 💍\n\n`;
-        mensaje += `*Grupo:* ${grupoLabel(grupos, invitadoDe)}\n`;
-        mensaje += `*Titular:* ${invitado?.nombre || ''} ${invitado?.apellido || ''}\n`;
-        mensaje += `*Personas en este envío:* ${guests.length} (${yaConfirmados + guests.length}/${maxSlots} total)\n\n`;
+        const hostsStr = formatHostsNames(hosts);
+        const introLine = interpolateTemplate(
+            copy?.rsvp?.whatsappIntro || '¡Hola! Confirmo asistencia a la invitación de {hosts} ✨',
+            { hosts: hostsStr }
+        );
 
-        guests.forEach((guest, index) => {
-            const contornos = guest.contornos.map((c) => c.nombre).join(' y ');
-            mensaje += `*${guest.esTitular ? 'Titular' : `Acompañante ${yaTieneTitular ? yaConfirmados + index : index}`}:* ${fullNameOf(guest)}\n`;
-            if (guest.platoFuerte) {
-                mensaje += `• Plato fuerte: ${guest.platoFuerte.nombre}\n`;
+        let message = `${introLine}\n\n`;
+        if (groups.length > 1) {
+            message += `*Grupo:* ${getGroupLabel(groups, selectedGroupId)}\n`;
+        }
+        message += `*Titular:* ${guest?.first_name || ''} ${guest?.last_name || ''}\n`;
+        message += `*Personas en este envío:* ${attendees.length} (${alreadyConfirmed + attendees.length}/${maxPasses} total)\n\n`;
+
+        attendees.forEach((att, idx) => {
+            const sidesText = att.sides.map((s) => s.name).join(' y ');
+            const roleLabel = att.isPrimary
+                ? 'Titular'
+                : `Acompañante ${alreadyHasPrimary ? alreadyConfirmed + idx : idx}`;
+            message += `*${roleLabel}:* ${fullNameOf(att)}\n`;
+            if (att.mainCourse) {
+                message += `• Plato fuerte: ${att.mainCourse.name}\n`;
             }
-            if (contornos) {
-                mensaje += `• Contornos: ${contornos}\n`;
+            if (sidesText) {
+                message += `• Contornos: ${sidesText}\n`;
             }
-            mensaje += `\n`;
+            message += `\n`;
         });
 
-        const parsedDate = parseFecha(fecha);
+        const parsedDate = parseDate(eventDate);
         const dateStr = parsedDate
             ? parsedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
             : '';
         if (dateStr) {
-            mensaje += `¡Nos vemos el ${dateStr}!`;
+            message += `¡Nos vemos el ${dateStr}!`;
         }
 
-        const encoded = encodeURIComponent(mensaje);
+        const encoded = encodeURIComponent(message);
         const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
         return `https://wa.me/${cleanPhone}?text=${encoded}`;
     };
@@ -196,27 +214,27 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
         setSubmitError(null);
 
         try {
-            if (!supabase || !invitado?.token) {
-                throw new Error('No se encontró el token de tu invitación.');
+            if (!supabase || !guest?.access_token) {
+                throw new Error('No se encontró el enlace de tu invitación.');
             }
 
-            const payload = guests.map((g) => ({
-                nombre: g.nombre.trim(),
-                apellido: g.apellido.trim(),
-                plato_fuerte: g.platoFuerte?.id || null,
-                contornos: g.contornos.map((c) => c.id),
-                regalo_id: g.regalo || null,
+            const payload = attendees.map((a) => ({
+                first_name: a.firstName.trim(),
+                last_name: a.lastName.trim(),
+                main_course_id: a.mainCourse?.id || null,
+                side_ids: a.sides.map((s) => s.id),
+                gift_option_id: a.giftOption || null,
             }));
 
-            const { data, error } = await supabase.rpc('confirmar_asistencia', {
-                p_token: invitado.token,
-                p_asistentes: payload,
+            const { data, error } = await supabase.rpc('submit_rsvp', {
+                p_token: guest.access_token,
+                p_attendees: payload,
             });
 
             if (error) throw error;
 
             if (onConfirmed) {
-                await onConfirmed(data || { ...invitado, confirmed_at: new Date().toISOString() });
+                await onConfirmed(data || { ...guest, confirmed_at: new Date().toISOString() });
             }
 
             const link = generateWhatsAppLink();
@@ -228,29 +246,31 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
             }, 800);
         } catch (err) {
             console.error('[RsvpModal] Error saving confirmation:', err);
-            setSubmitError(friendlyError(err));
+            setSubmitError(formatDbError(err));
             setSubmitting(false);
         }
     };
 
+    const groupPromptText = copy?.rsvp?.groupPrompt || '¿De parte de quién nos acompañas?';
+
     const getStepLabel = () => {
-        if (step === 1) return 'Paso 1/4: ¿De parte de quién vienes?';
+        if (step === 1) return `Paso 1/4: ${groupPromptText}`;
         if (step === 2) {
-            return yaTieneTitular
-                ? `Agregar acompañantes (${cuposRestantes} ${cuposRestantes === 1 ? 'pase disponible' : 'pases disponibles'})`
-                : `Paso 2/4: ¿Quiénes asisten? (Máx ${maxSlots})`;
+            return alreadyHasPrimary
+                ? `Agregar acompañantes (${remainingPasses} ${remainingPasses === 1 ? 'pase disponible' : 'pases disponibles'})`
+                : `¿Quiénes asisten? (Máx ${maxPasses})`;
         }
         if (step === 2.5) return 'Tienes pases disponibles en tu invitación';
         if (step === 3) {
-            if (menuStep === 'platoFuerte') return `${fullNameOf(currentGuest)}: Plato fuerte`;
-            if (menuStep === 'contornos') return `${fullNameOf(currentGuest)}: Contornos`;
+            if (menuStep === 'mainCourse') return `${fullNameOf(currentAttendee)}: Plato fuerte`;
+            if (menuStep === 'sides') return `${fullNameOf(currentAttendee)}: Contornos`;
         }
         if (step === 4) return 'Confirmar asistencia';
         return '';
     };
 
     const progressStep = step === 2.5 ? 2 : step;
-    const pasesSinUsarAhora = cuposRestantes - guests.length;
+    const unusedPassesNow = remainingPasses - attendees.length;
 
     return (
         <AnimatePresence>
@@ -283,7 +303,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                             <UtensilsCrossed size={32} />
                         </div>
                         <h3 className="font-heading text-4xl text-primary">
-                            {yaTieneTitular ? 'Agregar Acompañantes' : (textos?.rsvp?.titulo || 'Confirmar Asistencia')}
+                            {alreadyHasPrimary ? 'Agregar Acompañantes' : (copy?.rsvp?.title || 'Confirmar Asistencia')}
                         </h3>
                         <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">
                             {getStepLabel()}
@@ -302,7 +322,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                     </div>
 
                     <div className="p-6">
-                        {/* Step 1: Grupo */}
+                        {/* Step 1: Dynamic Group Selection */}
                         {step === 1 && (
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
@@ -312,20 +332,20 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                             >
                                 <div className="text-center">
                                     <Heart size={44} className="mx-auto text-primary mb-3" />
-                                    <h4 className="font-semibold text-gray-600 text-2xl tracking-wide">
-                                        ¿De parte de quién asisten?
+                                    <h4 className="font-semibold text-gray-600 text-2xl tracking-wide break-anywhere">
+                                        {groupPromptText}
                                     </h4>
                                     <p className="text-sm text-gray-400 mt-1">Selecciona una opción</p>
                                 </div>
 
-                                <div className={`grid gap-3 ${grupos.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
-                                    {grupos.map((g) => {
-                                        const active = invitadoDe === g.id;
-                                        const style = grupoColorStyle(g.color);
+                                <div className={`grid gap-3 ${groups.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                                    {groups.map((g) => {
+                                        const active = selectedGroupId === g.id;
+                                        const style = getGroupColorStyle(g.color);
                                         return (
                                             <motion.button
                                                 key={g.id}
-                                                onClick={() => setInvitadoDe(g.id)}
+                                                onClick={() => setSelectedGroupId(g.id)}
                                                 className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-2.5 cursor-pointer text-center ${
                                                     active ? style.cardActive : style.cardIdle
                                                 }`}
@@ -337,15 +357,11 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                                         active ? style.circleActive : style.circleIdle
                                                     }`}
                                                 >
-                                                    {g.id === 'novia' ? (
-                                                        <img src={vestido} alt={g.nombre} className="w-9 h-9 object-contain" />
-                                                    ) : g.id === 'novio' ? (
-                                                        <img src={camisa} alt={g.nombre} className="w-9 h-9 object-contain" />
-                                                    ) : (
-                                                        <Users size={26} />
-                                                    )}
+                                                    {renderGroupIcon(g.iconKey, g.name)}
                                                 </div>
-                                                <span className="font-bold text-base text-gray-700 leading-tight">{g.nombre}</span>
+                                                <span className="font-bold text-base text-gray-700 leading-tight break-anywhere">
+                                                    {g.name}
+                                                </span>
                                             </motion.button>
                                         );
                                     })}
@@ -353,9 +369,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
 
                                 <button
                                     onClick={() => setStep(2)}
-                                    disabled={!invitadoDe}
+                                    disabled={!selectedGroupId}
                                     className={`w-full mt-4 py-4 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                        invitadoDe
+                                        selectedGroupId
                                             ? 'bg-primary text-white hover:bg-secondary shadow-md'
                                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                     }`}
@@ -366,7 +382,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                             </motion.div>
                         )}
 
-                        {/* Step 2: Nombres y Apellidos */}
+                        {/* Step 2: Attendees First & Last Names */}
                         {step === 2 && (
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
@@ -377,23 +393,23 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                 <div className="text-center mb-4">
                                     <Users size={40} className="mx-auto text-primary mb-2" />
                                     <h4 className="font-semibold text-gray-700 text-2xl tracking-wide">
-                                        {yaTieneTitular ? '¿Qué acompañantes agregarás?' : '¿Quiénes van a asistir?'}
+                                        {alreadyHasPrimary ? '¿Qué acompañantes agregarás?' : '¿Quiénes van a asistir?'}
                                     </h4>
-                                    {yaTieneTitular ? (
+                                    {alreadyHasPrimary ? (
                                         <p className="text-xs text-gray-500 mt-1">
-                                            Ya registraste <strong>{yaConfirmados} de {maxSlots}</strong> pases. Puedes añadir hasta{' '}
-                                            <strong>{cuposRestantes} acompañante{cuposRestantes === 1 ? '' : 's'}</strong> más.
+                                            Ya registraste <strong>{alreadyConfirmed} de {maxPasses}</strong> pases. Puedes añadir hasta{' '}
+                                            <strong>{remainingPasses} acompañante{remainingPasses === 1 ? '' : 's'}</strong> más.
                                         </p>
                                     ) : (
                                         <p className="text-xs text-gray-500 mt-1">
-                                            Tu invitación es válida para hasta <strong>{maxSlots} persona{maxSlots > 1 ? 's' : ''}</strong> (Tú + {rawSlots} acompañante{rawSlots === 1 ? '' : 's'}).
+                                            Tu invitación es válida para hasta <strong>{maxPasses} persona{maxPasses > 1 ? 's' : ''}</strong> (Tú + {extraPasses} acompañante{extraPasses === 1 ? '' : 's'}).
                                         </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-3">
-                                    {guests.map((guest, index) => {
-                                        const isLockedTitular = guest.esTitular && index === 0;
+                                    {attendees.map((att, index) => {
+                                        const isLockedPrimary = att.isPrimary && index === 0;
                                         return (
                                             <motion.div
                                                 key={index}
@@ -404,15 +420,15 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center text-primary flex-shrink-0 font-bold text-xs">
-                                                            {yaTieneTitular ? yaConfirmados + index + 1 : index + 1}
+                                                            {alreadyHasPrimary ? alreadyConfirmed + index + 1 : index + 1}
                                                         </div>
                                                         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                                            {guest.esTitular ? 'Titular' : `Acompañante ${yaTieneTitular ? yaConfirmados + index : index}`}
+                                                            {att.isPrimary ? 'Titular' : `Acompañante ${alreadyHasPrimary ? alreadyConfirmed + index : index}`}
                                                         </span>
                                                     </div>
-                                                    {guests.length > 1 && !isLockedTitular && (
+                                                    {attendees.length > 1 && !isLockedPrimary && (
                                                         <button
-                                                            onClick={() => removeGuest(index)}
+                                                            onClick={() => removeAttendee(index)}
                                                             className="p-1.5 text-red-400 hover:text-red-600 rounded-full transition-colors cursor-pointer"
                                                             title="Quitar acompañante"
                                                         >
@@ -423,24 +439,26 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <input
                                                         type="text"
-                                                        value={guest.nombre}
-                                                        onChange={(e) => updateGuestField(index, 'nombre', e.target.value)}
-                                                        readOnly={isLockedTitular && Boolean(invitado?.nombre)}
+                                                        value={att.firstName}
+                                                        maxLength={EVENT_LIMITS.rsvp.firstNameMax}
+                                                        onChange={(e) => updateAttendeeField(index, 'firstName', e.target.value)}
+                                                        readOnly={isLockedPrimary && Boolean(guest?.first_name)}
                                                         placeholder="Nombre *"
                                                         className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
-                                                            isLockedTitular && invitado?.nombre
+                                                            isLockedPrimary && guest?.first_name
                                                                 ? 'bg-gray-100 border-gray-200 text-gray-600'
                                                                 : 'bg-white border-gray-300 text-gray-700'
                                                         }`}
                                                     />
                                                     <input
                                                         type="text"
-                                                        value={guest.apellido}
-                                                        onChange={(e) => updateGuestField(index, 'apellido', e.target.value)}
-                                                        readOnly={isLockedTitular && Boolean(invitado?.apellido)}
+                                                        value={att.lastName}
+                                                        maxLength={EVENT_LIMITS.rsvp.lastNameMax}
+                                                        onChange={(e) => updateAttendeeField(index, 'lastName', e.target.value)}
+                                                        readOnly={isLockedPrimary && Boolean(guest?.last_name)}
                                                         placeholder="Apellido *"
                                                         className={`w-full px-2.5 py-1.5 rounded-lg border text-sm focus:border-primary focus:outline-none ${
-                                                            isLockedTitular && invitado?.apellido
+                                                            isLockedPrimary && guest?.last_name
                                                                 ? 'bg-gray-100 border-gray-200 text-gray-600'
                                                                 : 'bg-white border-gray-300 text-gray-700'
                                                         }`}
@@ -451,20 +469,20 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                     })}
                                 </div>
 
-                                {guests.length < cuposRestantes && (
+                                {attendees.length < remainingPasses && (
                                     <motion.button
-                                        onClick={addGuest}
+                                        onClick={addAttendee}
                                         className="w-full p-3 rounded-xl border-2 border-dashed border-primary/30 text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm font-semibold"
                                         whileHover={{ scale: 1.01 }}
                                         whileTap={{ scale: 0.98 }}
                                     >
                                         <Plus size={18} />
-                                        Agregar acompañante ({yaConfirmados + guests.length}/{maxSlots})
+                                        Agregar acompañante ({alreadyConfirmed + attendees.length}/{maxPasses})
                                     </motion.button>
                                 )}
 
                                 <div className="flex gap-3 mt-6">
-                                    {!yaTieneTitular && (
+                                    {!skipGroupStep && (
                                         <button
                                             onClick={() => setStep(1)}
                                             className="flex-1 py-3.5 rounded-full font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -475,9 +493,9 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                     )}
                                     <button
                                         onClick={handleContinueFromStep2}
-                                        disabled={!allGuestsHaveNames()}
+                                        disabled={!allAttendeesHaveNames()}
                                         className={`flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                            allGuestsHaveNames()
+                                            allAttendeesHaveNames()
                                                 ? 'bg-primary text-white hover:bg-secondary shadow-md'
                                                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                         }`}
@@ -489,7 +507,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                             </motion.div>
                         )}
 
-                        {/* Step 2.5: Aviso elegante de pases disponibles sin usar */}
+                        {/* Step 2.5: Unused Passes Notice */}
                         {step === 2.5 && (
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.96 }}
@@ -506,12 +524,12 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                         ¡Tienes pases disponibles!
                                     </h4>
                                     <p className="text-sm text-gray-600 leading-relaxed max-w-sm mx-auto">
-                                        Tu invitación incluye <strong>{maxSlots} persona{maxSlots > 1 ? 's' : ''}</strong> en total
-                                        {yaConfirmados > 0 && ` (ya confirmaste ${yaConfirmados})`}.
-                                        {guests.length === 1 && !yaTieneTitular ? (
-                                            <> Estás a punto de confirmar solo por ti, quedando <strong>{pasesSinUsarAhora} acompañante{pasesSinUsarAhora === 1 ? '' : 's'}</strong> sin registrar.</>
+                                        Tu invitación incluye <strong>{maxPasses} persona{maxPasses > 1 ? 's' : ''}</strong> en total
+                                        {alreadyConfirmed > 0 && ` (ya confirmaste ${alreadyConfirmed})`}.
+                                        {attendees.length === 1 && !alreadyHasPrimary ? (
+                                            <> Estás a punto de confirmar solo por ti, quedando <strong>{unusedPassesNow} acompañante{unusedPassesNow === 1 ? '' : 's'}</strong> sin registrar.</>
                                         ) : (
-                                            <> Aún te {pasesSinUsarAhora === 1 ? 'queda' : 'quedan'} <strong>{pasesSinUsarAhora} pase{pasesSinUsarAhora === 1 ? '' : 's'}</strong> sin usar.</>
+                                            <> Aún te {unusedPassesNow === 1 ? 'queda' : 'quedan'} <strong>{unusedPassesNow} pase{unusedPassesNow === 1 ? '' : 's'}</strong> sin usar.</>
                                         )}
                                     </p>
                                 </div>
@@ -523,8 +541,8 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                 <div className="flex flex-col gap-2.5 pt-2">
                                     <button
                                         onClick={() => {
-                                            if (guests.length < cuposRestantes) {
-                                                setGuests([...guests, createEmptyGuest()]);
+                                            if (attendees.length < remainingPasses) {
+                                                setAttendees([...attendees, createEmptyAttendee()]);
                                             }
                                             setStep(2);
                                         }}
@@ -536,8 +554,8 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                     <button
                                         onClick={() => {
                                             setStep(3);
-                                            setCurrentGuestIndex(0);
-                                            setMenuStep('platoFuerte');
+                                            setCurrentIndex(0);
+                                            setMenuStep('mainCourse');
                                         }}
                                         className="w-full py-3 rounded-full font-semibold border border-primary/30 text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
                                     >
@@ -548,52 +566,52 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                             </motion.div>
                         )}
 
-                        {/* Step 3: Menú por invitado */}
+                        {/* Step 3: Menu per Attendee */}
                         {step === 3 && (
                             <motion.div
-                                key={`guest-${currentGuestIndex}-${menuStep}`}
+                                key={`att-${currentIndex}-${menuStep}`}
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
                                 className="space-y-4"
                             >
                                 <div className="flex items-center justify-center gap-2 mb-4">
-                                    {guests.map((guest, index) => (
+                                    {attendees.map((att, index) => (
                                         <div
                                             key={index}
                                             className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                                index === currentGuestIndex
+                                                index === currentIndex
                                                     ? 'bg-primary text-white scale-110 shadow-sm'
                                                     : 'bg-gray-200 text-gray-500'
                                             }`}
-                                            title={fullNameOf(guest)}
+                                            title={fullNameOf(att)}
                                         >
                                             {index + 1}
                                         </div>
                                     ))}
                                 </div>
 
-                                {menuStep === 'platoFuerte' && (
+                                {menuStep === 'mainCourse' && (
                                     <>
                                         <h4 className="font-semibold text-gray-700 text-2xl text-center">
-                                            Plato fuerte para <span className="text-primary font-heading text-3xl">{fullNameOf(currentGuest)}</span>
+                                            Plato fuerte para <span className="text-primary font-heading text-3xl">{fullNameOf(currentAttendee)}</span>
                                         </h4>
 
                                         <div className="space-y-2 pt-2">
-                                            {platosList.map((plato) => (
+                                            {mainCoursesList.map((course) => (
                                                 <motion.button
-                                                    key={plato.id}
-                                                    onClick={() => updateCurrentGuest({ platoFuerte: plato })}
+                                                    key={course.id}
+                                                    onClick={() => updateCurrentAttendee({ mainCourse: course })}
                                                     className={`w-full p-3.5 rounded-xl border-2 transition-all duration-200 flex items-center justify-between text-left cursor-pointer ${
-                                                        currentGuest.platoFuerte?.id === plato.id
+                                                        currentAttendee.mainCourse?.id === course.id
                                                             ? 'border-primary bg-primary/10 shadow-sm'
                                                             : 'border-gray-200 hover:border-primary/40 hover:bg-gray-50'
                                                     }`}
                                                     whileHover={{ scale: 1.01 }}
                                                     whileTap={{ scale: 0.99 }}
                                                 >
-                                                    <span className="font-medium text-gray-700 text-base">{plato.nombre}</span>
-                                                    {currentGuest.platoFuerte?.id === plato.id && (
+                                                    <span className="font-medium text-gray-700 text-base break-anywhere">{course.name}</span>
+                                                    {currentAttendee.mainCourse?.id === course.id && (
                                                         <div className="bg-primary text-white rounded-full p-1">
                                                             <Check size={14} />
                                                         </div>
@@ -604,7 +622,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
 
                                         <div className="flex gap-3 mt-6">
                                             <button
-                                                onClick={goToPrevGuest}
+                                                onClick={goToPrevAttendee}
                                                 className="flex-1 py-3.5 rounded-full font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
                                             >
                                                 <ChevronLeft size={18} />
@@ -612,15 +630,15 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                             </button>
                                             <button
                                                 onClick={() => {
-                                                    if (contornosList.length === 0 || maxContornos === 0) {
-                                                        goToNextGuest();
+                                                    if (sidesList.length === 0 || maxSides === 0) {
+                                                        goToNextAttendee();
                                                     } else {
-                                                        setMenuStep('contornos');
+                                                        setMenuStep('sides');
                                                     }
                                                 }}
-                                                disabled={!currentGuest.platoFuerte}
+                                                disabled={!currentAttendee.mainCourse}
                                                 className={`flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                                    currentGuest.platoFuerte
+                                                    currentAttendee.mainCourse
                                                         ? 'bg-primary text-white hover:bg-secondary shadow-md'
                                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                                 }`}
@@ -632,24 +650,24 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                     </>
                                 )}
 
-                                {menuStep === 'contornos' && (
+                                {menuStep === 'sides' && (
                                     <>
                                         <h4 className="font-semibold text-gray-700 text-2xl text-center">
-                                            Contornos para <span className="text-primary font-heading text-3xl">{fullNameOf(currentGuest)}</span>
+                                            Contornos para <span className="text-primary font-heading text-3xl">{fullNameOf(currentAttendee)}</span>
                                         </h4>
                                         <p className="text-xs text-gray-500 text-center mb-4">
-                                            Selecciona entre 1 y {maxContornos} ({currentGuest.contornos.length}/{maxContornos} seleccionados)
+                                            Selecciona entre 1 y {maxSides} ({currentAttendee.sides.length}/{maxSides} seleccionados)
                                         </p>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            {contornosList.map((contorno) => {
-                                                const isSelected = currentGuest.contornos.find((c) => c.id === contorno.id);
-                                                const isDisabled = currentGuest.contornos.length >= maxContornos && !isSelected;
+                                            {sidesList.map((side) => {
+                                                const isSelected = currentAttendee.sides.find((s) => s.id === side.id);
+                                                const isDisabled = currentAttendee.sides.length >= maxSides && !isSelected;
 
                                                 return (
                                                     <motion.button
-                                                        key={contorno.id}
-                                                        onClick={() => toggleContorno(contorno)}
+                                                        key={side.id}
+                                                        onClick={() => toggleSide(side)}
                                                         disabled={isDisabled}
                                                         className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center text-center min-h-[70px] cursor-pointer ${
                                                             isSelected
@@ -659,7 +677,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                                                     : 'border-gray-200 hover:border-primary/40 hover:bg-gray-50'
                                                         }`}
                                                     >
-                                                        <span className="font-medium text-gray-700 text-sm">{contorno.nombre}</span>
+                                                        <span className="font-medium text-gray-700 text-sm break-anywhere">{side.name}</span>
                                                         {isSelected && (
                                                             <div className="bg-primary text-white rounded-full p-0.5 mt-1">
                                                                 <Check size={12} />
@@ -672,22 +690,22 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
 
                                         <div className="flex gap-3 mt-6">
                                             <button
-                                                onClick={() => setMenuStep('platoFuerte')}
+                                                onClick={() => setMenuStep('mainCourse')}
                                                 className="flex-1 py-3.5 rounded-full font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
                                             >
                                                 <ChevronLeft size={18} />
                                                 Atrás
                                             </button>
                                             <button
-                                                onClick={goToNextGuest}
-                                                disabled={maxContornos > 0 && currentGuest.contornos.length < 1}
+                                                onClick={goToNextAttendee}
+                                                disabled={maxSides > 0 && currentAttendee.sides.length < 1}
                                                 className={`flex-1 py-3.5 rounded-full font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                                    maxContornos === 0 || currentGuest.contornos.length >= 1
+                                                    maxSides === 0 || currentAttendee.sides.length >= 1
                                                         ? 'bg-primary text-white hover:bg-secondary shadow-md'
                                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                                 }`}
                                             >
-                                                {currentGuestIndex < guests.length - 1 ? 'Siguiente invitado' : 'Ver resumen'}
+                                                {currentIndex < attendees.length - 1 ? 'Siguiente invitado' : 'Ver resumen'}
                                                 <ChevronRight size={18} />
                                             </button>
                                         </div>
@@ -696,7 +714,7 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                             </motion.div>
                         )}
 
-                        {/* Step 4: Resumen */}
+                        {/* Step 4: Summary */}
                         {step === 4 && (
                             <motion.div
                                 initial={{ opacity: 0, x: 20 }}
@@ -724,25 +742,27 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                 )}
 
                                 <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
-                                    {guests.map((g, idx) => (
+                                    {attendees.map((a, idx) => (
                                         <div key={idx} className="bg-primary/5 p-3.5 rounded-xl border border-primary/20 text-sm">
                                             <div className="font-bold text-gray-800 mb-1 flex items-center gap-2">
                                                 <span className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs">
                                                     {idx + 1}
                                                 </span>
-                                                {fullNameOf(g)}
+                                                {fullNameOf(a)}
                                             </div>
                                             <div className="text-gray-600 pl-7 text-xs space-y-0.5">
-                                                <p>• <strong>Plato:</strong> {g.platoFuerte?.nombre}</p>
-                                                <p>• <strong>Contornos:</strong> {g.contornos.map((c) => c.nombre).join(', ')}</p>
+                                                <p>• <strong>Plato:</strong> {a.mainCourse?.name}</p>
+                                                {a.sides.length > 0 && (
+                                                    <p>• <strong>Contornos:</strong> {a.sides.map((s) => s.name).join(', ')}</p>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
 
-                                {pasesSinUsarAhora > 0 && (
+                                {unusedPassesNow > 0 && (
                                     <p className="text-[11px] text-center text-gray-500">
-                                        Te quedarán <strong>{pasesSinUsarAhora} {pasesSinUsarAhora === 1 ? 'pase disponible' : 'pases disponibles'}</strong> por si deseas agregar acompañantes luego.
+                                        Te quedarán <strong>{unusedPassesNow} {unusedPassesNow === 1 ? 'pase disponible' : 'pases disponibles'}</strong> por si deseas agregar acompañantes luego.
                                     </p>
                                 )}
 
@@ -750,8 +770,8 @@ const RsvpModal = ({ isOpen, onClose, invitado, confirmacionesPrevias = [], onCo
                                     <button
                                         onClick={() => {
                                             setStep(3);
-                                            setCurrentGuestIndex(guests.length - 1);
-                                            setMenuStep('contornos');
+                                            setCurrentIndex(attendees.length - 1);
+                                            setMenuStep(sidesList.length > 0 && maxSides > 0 ? 'sides' : 'mainCourse');
                                         }}
                                         disabled={submitting}
                                         className="flex-1 py-3.5 rounded-full font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 cursor-pointer"

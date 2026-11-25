@@ -7,7 +7,7 @@ import SaveTheDate from './components/SaveTheDate';
 import EventCards from './components/EventCards';
 import Timeline from './components/Timeline';
 import RsvpSection from './components/RsvpSection';
-import ParentsSection from './components/ParentsSection';
+import SpecialMentionsSection from './components/SpecialMentionsSection';
 import Gallery from './components/Gallery';
 import QuoteSection from './components/QuoteSection';
 import Acknowledgements from './components/Acknowledgements';
@@ -15,7 +15,7 @@ import AdminPanel from './components/AdminPanel';
 import AdminLogin from './components/AdminLogin';
 import { supabase } from './lib/supabase';
 
-function InvitacionContent({ invitado, confirmaciones, onReload }) {
+function InvitationView({ guest, attendees, onReload }) {
     const [entered, setEntered] = useState(false);
     const [autoPlayMusic, setAutoPlayMusic] = useState(true);
 
@@ -38,12 +38,12 @@ function InvitacionContent({ invitado, confirmaciones, onReload }) {
             <EventCards />
             <Timeline />
             <RsvpSection
-                invitado={invitado}
-                confirmaciones={confirmaciones}
+                guest={guest}
+                attendees={attendees}
                 onReload={onReload}
             />
-            <ParentsSection />
-            <Gallery invitado={invitado} />
+            <SpecialMentionsSection />
+            <Gallery guest={guest} />
             <QuoteSection />
             <Acknowledgements />
         </div>
@@ -51,7 +51,7 @@ function InvitacionContent({ invitado, confirmaciones, onReload }) {
 }
 
 function AdminGate() {
-    const [session, setSession] = useState(undefined); // undefined = cargando
+    const [session, setSession] = useState(undefined);
 
     useEffect(() => {
         let mounted = true;
@@ -106,10 +106,10 @@ function App() {
 
     return (
         <AccessGate>
-            {(invitado, confirmaciones, reload) => (
-                <InvitacionContent
-                    invitado={invitado}
-                    confirmaciones={confirmaciones}
+            {(guest, attendees, reload) => (
+                <InvitationView
+                    guest={guest}
+                    attendees={attendees}
                     onReload={reload}
                 />
             )}

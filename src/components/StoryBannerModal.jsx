@@ -1,13 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Sparkles } from 'lucide-react';
-import { useConfig } from '../context/ConfigContext';
-import { parseFecha } from '../utils/fechas';
+import { useEventConfig } from '../context/EventConfigContext';
+import { parseDate } from '../utils/dateUtils';
+import { getEventSlug } from '../config/eventPresets';
+import { slugify } from '../utils/menuUtils';
 
-/**
- * Dibuja texto centrado con salto de línea automático para evitar desbordes.
- * Devuelve la coordenada Y final después de la última línea.
- */
 function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
     if (!text) return y;
     const words = String(text).split(/\s+/);
@@ -32,15 +30,27 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 const StoryBannerModal = ({ isOpen, onClose }) => {
-    const { config } = useConfig();
+    const { config } = useEventConfig();
     const canvasRef = useRef(null);
     const [downloading, setDownloading] = useState(false);
 
     if (!isOpen) return null;
 
-    const { novios, fecha, venues } = config;
-    const venue = venues[0] || {};
-    const dateObj = parseFecha(fecha) || new Date();
+    const { hosts, eventDate, locations, copy, eventType } = config;
+    const loc = locations[0] || {};
+    const primaryName = hosts?.primary?.firstName?.trim() || 'Evento';
+    const secondaryName = hosts?.secondary?.firstName?.trim() || '';
+    const hasTwoHosts = Boolean(primaryName && secondaryName);
+
+    const storyBadge = (
+        copy?.sharing?.storyBadge ||
+        copy?.hero?.badge ||
+        '¡ESTÁS INVITADO!'
+    ).toUpperCase();
+    const storyFooter =
+        copy?.sharing?.storyFooter || '"Acompáñanos en este día especial"';
+
+    const dateObj = parseDate(eventDate) || new Date();
     const dateFormatted = dateObj.toLocaleDateString('es-ES', {
         day: 'numeric',
         month: 'long',
@@ -51,6 +61,8 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
         minute: '2-digit',
         hour12: true,
     });
+
+    const venueTitle = loc.venueName || loc.platform || '';
 
     const handleDownloadStory = () => {
         setDownloading(true);
@@ -63,11 +75,10 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
         const ctx = canvas.getContext('2d');
         const W = 1080;
         const H = 1920;
-        const MAX_TEXT_W = W - 220; // Margen seguro dentro del marco interior (80px por lado + 30px)
+        const MAX_TEXT_W = W - 220;
         canvas.width = W;
         canvas.height = H;
 
-        // Fondo degradado suave
         const grad = ctx.createLinearGradient(0, 0, 0, H);
         grad.addColorStop(0, '#FFFFFF');
         grad.addColorStop(0.5, '#F7FAF7');
@@ -75,7 +86,6 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
 
-        // Marco decorativo doble
         ctx.strokeStyle = '#7FB383';
         ctx.lineWidth = 4;
         ctx.strokeRect(60, 60, W - 120, H - 120);
@@ -84,17 +94,14 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
         ctx.lineWidth = 2;
         ctx.strokeRect(80, 80, W - 160, H - 160);
 
-        // Badge superior
         ctx.textAlign = 'center';
         ctx.fillStyle = '#7FB383';
         ctx.font = 'bold 34px Lato, sans-serif';
         if ('letterSpacing' in ctx) ctx.letterSpacing = '10px';
-        ctx.fillText('¡NOS CASAMOS!', W / 2, 360);
+        ctx.fillText(storyBadge, W / 2, 360, MAX_TEXT_W);
 
-        // IMPORTANTE: resetear letterSpacing para que no se desborden los textos siguientes
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 
-        // Divisor
         ctx.beginPath();
         ctx.moveTo(W / 2 - 120, 420);
         ctx.lineTo(W / 2 + 120, 420);
@@ -102,20 +109,20 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Nombres de los novios
         ctx.font = 'italic 132px "Great Vibes", cursive, serif';
         ctx.fillStyle = '#658F68';
-        ctx.fillText(`${novios.novio.nombre}`, W / 2, 660, MAX_TEXT_W);
+        if (hasTwoHosts) {
+            ctx.fillText(primaryName, W / 2, 660, MAX_TEXT_W);
+            ctx.font = '46px Lato, sans-serif';
+            ctx.fillStyle = '#7FB383';
+            ctx.fillText('&', W / 2, 755);
+            ctx.font = 'italic 132px "Great Vibes", cursive, serif';
+            ctx.fillStyle = '#658F68';
+            ctx.fillText(secondaryName, W / 2, 900, MAX_TEXT_W);
+        } else {
+            ctx.fillText(primaryName, W / 2, 770, MAX_TEXT_W);
+        }
 
-        ctx.font = '46px Lato, sans-serif';
-        ctx.fillStyle = '#7FB383';
-        ctx.fillText('&', W / 2, 755);
-
-        ctx.font = 'italic 132px "Great Vibes", cursive, serif';
-        ctx.fillStyle = '#658F68';
-        ctx.fillText(`${novios.novia.nombre}`, W / 2, 900, MAX_TEXT_W);
-
-        // Contenedor de fecha
         ctx.fillStyle = '#FFFFFF';
         ctx.shadowColor = 'rgba(0,0,0,0.06)';
         ctx.shadowBlur = 30;
@@ -140,12 +147,11 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
 
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 
-        // Lugar y dirección (con ajuste automático de línea)
         ctx.fillStyle = '#444444';
         ctx.font = 'bold 38px Lato, sans-serif';
-        const afterLugarY = drawWrappedText(
+        const afterVenueY = drawWrappedText(
             ctx,
-            venue.lugar || 'Lugar del Evento',
+            venueTitle || 'Ubicación Confirmada',
             W / 2,
             1420,
             MAX_TEXT_W,
@@ -154,32 +160,18 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
 
         ctx.fillStyle = '#777777';
         ctx.font = '30px Lato, sans-serif';
-        drawWrappedText(
-            ctx,
-            venue.direccion || '',
-            W / 2,
-            afterLugarY + 54,
-            MAX_TEXT_W,
-            40
-        );
+        drawWrappedText(ctx, loc.address || '', W / 2, afterVenueY + 54, MAX_TEXT_W, 40);
 
-        // Frase inferior con margen seguro y salto de línea automático
         ctx.fillStyle = '#7FB383';
         ctx.font = 'italic 36px Lato, sans-serif';
-        drawWrappedText(
-            ctx,
-            '"Acompáñanos a celebrar nuestro gran día"',
-            W / 2,
-            1685,
-            MAX_TEXT_W,
-            48
-        );
+        drawWrappedText(ctx, storyFooter, W / 2, 1685, MAX_TEXT_W, 48);
 
-        // Descargar imagen
         const url = canvas.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = url;
-        a.download = `historia-boda-${novios.novio.nombre}-${novios.novia.nombre}.png`;
+        const typeSlug = slugify(getEventSlug(eventType));
+        const hostSlug = slugify(hasTwoHosts ? `${primaryName}-${secondaryName}` : primaryName);
+        a.download = `historia-${typeSlug}-${hostSlug}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -216,29 +208,32 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
                     <div className="mx-auto w-[220px] aspect-[9/16] bg-gradient-to-b from-[#FCFCFA] to-[#EEF5EF] rounded-2xl border-4 border-primary/30 p-4 flex flex-col items-center justify-between shadow-inner text-center relative overflow-hidden select-none">
                         <div className="pt-2">
                             <span className="text-[9px] uppercase tracking-[0.2em] font-bold text-primary">
-                                ¡Nos Casamos!
+                                {storyBadge}
                             </span>
                             <div className="h-px w-8 bg-primary/30 mx-auto my-1.5" />
                         </div>
 
                         <div>
-                            <p className="font-heading text-3xl text-primary leading-tight">{novios.novio.nombre}</p>
-                            <span className="text-xs text-primary font-serif">&amp;</span>
-                            <p className="font-heading text-3xl text-primary leading-tight">{novios.novia.nombre}</p>
+                            <p className="font-heading text-3xl text-primary leading-tight">{primaryName}</p>
+                            {hasTwoHosts && (
+                                <>
+                                    <span className="text-xs text-primary font-serif">&amp;</span>
+                                    <p className="font-heading text-3xl text-primary leading-tight">{secondaryName}</p>
+                                </>
+                            )}
                         </div>
 
                         <div className="bg-white/90 p-2 rounded-xl shadow-xs w-full">
                             <p className="text-[10px] font-bold text-gray-700 uppercase">{dateFormatted}</p>
                             <p className="text-[9px] text-gray-500">{timeFormatted}</p>
-                            <p className="text-[8px] text-primary font-semibold mt-0.5 truncate">{venue.lugar}</p>
+                            <p className="text-[8px] text-primary font-semibold mt-0.5 truncate">{venueTitle}</p>
                         </div>
 
-                        <p className="text-[8px] italic text-gray-400 pb-1 px-1">
-                            &ldquo;Acompáñanos a celebrar nuestro gran día&rdquo;
+                        <p className="text-[8px] italic text-gray-400 pb-1 px-1 line-clamp-2">
+                            {storyFooter}
                         </p>
                     </div>
 
-                    {/* Hidden Canvas used for high-res 1080x1920 export */}
                     <canvas ref={canvasRef} className="hidden" />
 
                     <div className="mt-5 space-y-2">

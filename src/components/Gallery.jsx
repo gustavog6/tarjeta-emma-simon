@@ -1,54 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Image as ImageIcon, Images, X } from 'lucide-react';
-import { useConfig } from '../context/ConfigContext';
-import { INVITATION_LIMITS, limitList } from '../config/invitationLimits';
+import { useEventConfig } from '../context/EventConfigContext';
+import { EVENT_LIMITS, limitList } from '../config/eventLimits';
 import { supabase } from '../lib/supabase';
 import PhotoUploadModal from './PhotoUploadModal';
 import PhotoViewerModal from './PhotoViewerModal';
 
-const PREVIEW_LIMIT = INVITATION_LIMITS.galeria.previewMax;
+const PREVIEW_LIMIT = EVENT_LIMITS.gallery.previewMax;
+export const GALLERY_BUCKET = 'event-gallery';
 
-const Gallery = ({ invitado }) => {
-    const { config } = useConfig();
+/** Resolves public URL supporting both `event-gallery` and legacy `galeria` paths */
+export function resolvePhotoPublicUrl(storagePath = '') {
+    if (!storagePath) return '';
+    if (storagePath.startsWith('legacy:')) {
+        return supabase.storage.from('galeria').getPublicUrl(storagePath.slice(7)).data.publicUrl;
+    }
+    return supabase.storage.from(GALLERY_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+}
+
+const Gallery = ({ guest }) => {
+    const { config } = useEventConfig();
     const [photos, setPhotos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isAllModalOpen, setIsAllModalOpen] = useState(false);
-    const [viewerIndex, setViewerIndex] = useState(null); // null = cerrado
+    const [viewerIndex, setViewerIndex] = useState(null);
 
-    const puedeSubir = Boolean(invitado?.puede_subir_fotos);
+    const canUpload = Boolean(guest?.can_upload_photos);
 
     const loadPhotos = async () => {
         try {
             if (!supabase) return;
-            let data = null;
-            const { data: rpcData, error: rpcError } = await supabase.rpc('galeria_publica');
-
-            if (rpcError) {
-                if (rpcError.code === 'PGRST202' || rpcError.code === '42883') {
-                    const { data: fbData, error: fbError } = await supabase
-                        .from('fotos')
-                        .select('*, invitados(nombre, apellido)')
-                        .eq('estado', 'aprobada')
-                        .order('created_at', { ascending: false });
-                    if (fbError) throw fbError;
-                    data = fbData;
-                } else {
-                    throw rpcError;
-                }
-            } else {
-                data = rpcData;
-            }
+            const { data, error } = await supabase.rpc('get_approved_photos');
+            if (error) throw error;
 
             if (data && data.length > 0) {
-                const photoUrls = data.map((item) => {
-                    const { data: pubData } = supabase.storage
-                        .from('galeria')
-                        .getPublicUrl(item.storage_path);
-                    return { ...item, url: pubData.publicUrl };
-                });
-                setPhotos(photoUrls);
+                setPhotos(
+                    data.map((item) => ({
+                        ...item,
+                        url: resolvePhotoPublicUrl(item.storage_path),
+                    }))
+                );
             } else {
                 setPhotos([]);
             }
@@ -63,10 +56,10 @@ const Gallery = ({ invitado }) => {
         loadPhotos();
     }, []);
 
-    if (!config.galeria?.habilitada) return null;
-    if (!loading && photos.length === 0 && !puedeSubir) return null;
+    if (!config.gallery?.enabled) return null;
+    if (!loading && photos.length === 0 && !canUpload) return null;
 
-    const boundedPhotos = limitList(photos, INVITATION_LIMITS.galeria.totalVisibleMax);
+    const boundedPhotos = limitList(photos, EVENT_LIMITS.gallery.totalVisibleMax);
     const visiblePhotos = boundedPhotos.slice(0, PREVIEW_LIMIT);
     const extraCount = Math.max(0, boundedPhotos.length - PREVIEW_LIMIT);
 
@@ -79,7 +72,7 @@ const Gallery = ({ invitado }) => {
                         Toca cualquier foto para recorrer la galería y descargar tus favoritas en alta calidad.
                     </p>
 
-                    {puedeSubir && (
+                    {canUpload && (
                         <div className="mt-6">
                             <button
                                 onClick={() => setIsUploadOpen(true)}
@@ -115,7 +108,7 @@ const Gallery = ({ invitado }) => {
                                     >
                                         <img
                                             src={photo.url}
-                                            alt="Foto de boda"
+                                            alt="Fotografía del evento"
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                             loading="lazy"
                                         />
@@ -141,7 +134,7 @@ const Gallery = ({ invitado }) => {
                                     className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-primary/30 text-primary hover:bg-primary hover:text-white transition-all text-sm font-semibold shadow-sm cursor-pointer bg-white"
                                 >
                                     <Images size={17} />
-                                    Ver todas las fotos ({photos.length})
+                                    Ver todas las fotos ({boundedPhotos.length})
                                 </button>
                             </div>
                         )}
@@ -157,10 +150,9 @@ const Gallery = ({ invitado }) => {
                 )}
             </div>
 
-            {/* Modal de Galería Completa cuando hay más de 6 fotos */}
             <AnimatePresence>
                 {isAllModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-overlay">
                         <motion.div
                             className="absolute inset-0 bg-black/70 modal-backdrop"
                             initial={{ opacity: 0 }}
@@ -179,7 +171,7 @@ const Gallery = ({ invitado }) => {
                                     <h3 className="font-heading text-3xl text-primary leading-tight">
                                         Galería Completa
                                     </h3>
-                                    <p className="text-xs text-gray-500">{photos.length} recuerdos compartidos</p>
+                                    <p className="text-xs text-gray-500">{boundedPhotos.length} recuerdos compartidos</p>
                                 </div>
                                 <button
                                     onClick={() => setIsAllModalOpen(false)}
@@ -213,7 +205,7 @@ const Gallery = ({ invitado }) => {
             <PhotoUploadModal
                 isOpen={isUploadOpen}
                 onClose={() => setIsUploadOpen(false)}
-                invitado={invitado}
+                guest={guest}
                 onUploaded={loadPhotos}
             />
 

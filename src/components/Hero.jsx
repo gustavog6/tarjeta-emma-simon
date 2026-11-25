@@ -1,15 +1,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useConfig } from '../context/ConfigContext';
-import { INVITATION_LIMITS, clampText } from '../config/invitationLimits';
-import goldSilhouette from '../assets/corazon-verde-solo-2.png';
+import { useEventConfig } from '../context/EventConfigContext';
+import { EVENT_LIMITS, clampText } from '../config/eventLimits';
+import { formatHostsNames } from '../config/eventPresets';
+import heroOrnament from '../assets/hero-ornament.png';
 
 const Hero = () => {
-    const { config } = useConfig();
-    const { novia, novio } = config.novios;
-    const badge = clampText(config.textos?.hero?.badge, INVITATION_LIMITS.hero.badgeMax);
-    const nombreNovio = clampText(novio?.nombre, INVITATION_LIMITS.novios.nombreMax);
-    const nombreNovia = clampText(novia?.nombre, INVITATION_LIMITS.novios.nombreMax);
+    const { config } = useEventConfig();
+    const badge = clampText(config.copy?.hero?.badge, EVENT_LIMITS.hero.badgeMax);
+    const hostsLabel = formatHostsNames({
+        primary: { firstName: clampText(config.hosts?.primary?.firstName, EVENT_LIMITS.hosts.firstNameMax) },
+        secondary: { firstName: clampText(config.hosts?.secondary?.firstName, EVENT_LIMITS.hosts.firstNameMax) },
+    });
 
     return (
         <section className="relative min-h-dvh-safe w-full overflow-x-clip flex flex-col items-center justify-center safe-overlay">
@@ -18,7 +20,7 @@ const Hero = () => {
                 <img
                     src="/images/bg-texture-turquesa-clean.png"
                     style={{ opacity: 0.8 }}
-                    alt={`${nombreNovio} & ${nombreNovia}`}
+                    alt={hostsLabel}
                     className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-200 to-background" />
@@ -28,7 +30,7 @@ const Hero = () => {
             <div className="relative z-20 text-center w-full max-w-4xl mx-auto px-4 pb-14 pt-6 min-w-0">
                 <div className="mb-4 flex justify-center">
                     <motion.img
-                        src={goldSilhouette}
+                        src={heroOrnament}
                         alt="Decoración"
                         className="w-56 sm:w-72 md:w-80 aspect-square object-contain opacity-90 drop-shadow-lg"
                         initial={{ opacity: 0, scale: 0.8 }}
@@ -51,7 +53,7 @@ const Hero = () => {
                         </div>
                     )}
                     <h1 className="font-heading hero-title-fluid mb-4 text-primary drop-shadow-xl break-anywhere">
-                        {nombreNovio} &amp; {nombreNovia}
+                        {hostsLabel}
                     </h1>
                 </motion.div>
             </div>

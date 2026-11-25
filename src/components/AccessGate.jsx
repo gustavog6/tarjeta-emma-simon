@@ -1,27 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useInvitado } from '../hooks/useInvitado';
-import { useConfig } from '../context/ConfigContext';
+import { useGuestAccess } from '../hooks/useGuestAccess';
+import { useEventConfig } from '../context/EventConfigContext';
+import { formatHostsNames } from '../config/eventPresets';
 
-/**
- * AccessGate
- * ───────────────────────────────────────────────
- * Controla el acceso a la invitación mediante el
- * token ?ref= de la URL.
- *
- * - Sin token o token inválido → pantalla neutra
- * - Token válido → renderiza children con prop `invitado`
- *
- * Uso:
- *   <AccessGate>
- *     {(invitado) => <App invitado={invitado} />}
- *   </AccessGate>
- */
 export default function AccessGate({ children }) {
-    const { config } = useConfig();
-    const { invitado, confirmaciones, loading, error, reload } = useInvitado();
+    const { config } = useEventConfig();
+    const { guest, attendees, loading, error, reload } = useGuestAccess();
+    const hostsLabel = formatHostsNames(config.hosts);
 
-    // ── Cargando ──────────────────────────────
     if (loading) {
         return (
             <div className="min-h-dvh-safe safe-overlay bg-background flex items-center justify-center">
@@ -38,8 +25,7 @@ export default function AccessGate({ children }) {
         );
     }
 
-    // ── Token inválido / ausente ───────────────
-    if (!invitado) {
+    if (!guest) {
         return (
             <div className="min-h-dvh-safe safe-overlay bg-background flex items-center justify-center">
                 <motion.div
@@ -49,7 +35,7 @@ export default function AccessGate({ children }) {
                     transition={{ duration: 0.8 }}
                 >
                     <p className="font-heading section-title-fluid text-primary mb-4 break-anywhere">
-                        {config.novios.novio.nombre} &amp; {config.novios.novia.nombre}
+                        {hostsLabel}
                     </p>
                     <div className="h-px w-16 bg-primary/30 mx-auto mb-6" />
                     <p className="text-gray-400 text-sm leading-relaxed">
@@ -64,6 +50,5 @@ export default function AccessGate({ children }) {
         );
     }
 
-    // ── Token válido → renderiza la invitación ─
-    return <>{children(invitado, confirmaciones, reload)}</>;
+    return <>{children(guest, attendees, reload)}</>;
 }

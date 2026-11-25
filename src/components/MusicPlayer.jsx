@@ -1,29 +1,20 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Music } from 'lucide-react';
-import { useConfig } from '../context/ConfigContext';
+import { useEventConfig } from '../context/EventConfigContext';
 
-/**
- * MusicPlayer
- * ─────────────────────────────────────────────────────
- * Botón flotante (bottom-right) para reproducir/pausar.
- * Si autoPlayOnMount es true, inicia la reproducción automáticamente
- * al abrir la invitación.
- */
 const MusicPlayer = ({ autoPlayOnMount = false }) => {
-    const { config } = useConfig();
-    const { src } = config.musica;
-    const audioRef      = useRef(null);
+    const { config } = useEventConfig();
+    const { src } = config.audio;
+    const audioRef = useRef(null);
     const [playing, setPlaying] = useState(false);
 
     useEffect(() => {
         if (autoPlayOnMount && audioRef.current) {
-            audioRef.current.play()
+            audioRef.current
+                .play()
                 .then(() => setPlaying(true))
-                .catch(() => {
-                    // Si el navegador bloquea, queda en pausa para interacción manual
-                    setPlaying(false);
-                });
+                .catch(() => setPlaying(false));
         }
     }, [autoPlayOnMount]);
 
@@ -41,12 +32,7 @@ const MusicPlayer = ({ autoPlayOnMount = false }) => {
 
     return (
         <>
-            <audio
-                ref={audioRef}
-                src={src}
-                loop
-                preload="auto"
-            />
+            <audio ref={audioRef} src={src} loop preload="auto" />
 
             <motion.button
                 onClick={toggle}
@@ -67,9 +53,8 @@ const MusicPlayer = ({ autoPlayOnMount = false }) => {
                             exit={{ opacity: 0, rotate: 90 }}
                             transition={{ duration: 0.2 }}
                         >
-                            {/* Ícono animado de ondas cuando reproduce */}
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <rect x="2"  y="8" width="3" height="8" rx="1.5" className="animate-[musicBar_1s_ease-in-out_infinite]" />
+                                <rect x="2"  y="8" width="3" height="8"  rx="1.5" className="animate-[musicBar_1s_ease-in-out_infinite]" />
                                 <rect x="7"  y="4" width="3" height="16" rx="1.5" className="animate-[musicBar_1s_ease-in-out_0.2s_infinite]" />
                                 <rect x="12" y="6" width="3" height="12" rx="1.5" className="animate-[musicBar_1s_ease-in-out_0.4s_infinite]" />
                                 <rect x="17" y="9" width="3" height="6"  rx="1.5" className="animate-[musicBar_1s_ease-in-out_0.1s_infinite]" />

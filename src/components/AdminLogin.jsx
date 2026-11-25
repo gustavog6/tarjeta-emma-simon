@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, AlertCircle, LogIn } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useConfig } from '../context/ConfigContext';
+import { useEventConfig } from '../context/EventConfigContext';
+import { formatHostsNames } from '../config/eventPresets';
 
 const AdminLogin = ({ onLoginSuccess }) => {
-    const { config } = useConfig();
+    const { config } = useEventConfig();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState(null);
 
-    const nombreNovio = config?.novios?.novio?.nombre || 'Simón';
-    const nombreNovia = config?.novios?.novia?.nombre || 'Emma';
+    const hostsLabel = formatHostsNames(config?.hosts);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -54,7 +54,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
                     </div>
                     <h1 className="text-lg font-bold text-gray-900">Panel de Administración</h1>
                     <p className="text-xs text-gray-500 mt-1">
-                        Boda {nombreNovio} &amp; {nombreNovia} — Acceso solo para los novios
+                        {hostsLabel} — Acceso exclusivo para organizadores
                     </p>
                 </div>
 
@@ -76,7 +76,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="novios@ejemplo.com"
+                                placeholder="admin@evento.com"
                                 autoComplete="email"
                                 required
                                 className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:border-primary focus:outline-none"

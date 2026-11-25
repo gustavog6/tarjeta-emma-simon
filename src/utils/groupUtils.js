@@ -1,6 +1,6 @@
 /**
- * Utilidades para grupos dinámicos definidos en `configuracion.grupos`.
- * Las clases de Tailwind se listan explícitamente para que el compilador las incluya.
+ * src/utils/groupUtils.js
+ * Styling and lookup helpers for dynamic guest groups (`guest_groups` table).
  */
 
 export const GROUP_COLORS = {
@@ -59,19 +59,27 @@ export const COLOR_OPTIONS = Object.entries(GROUP_COLORS).map(([value, cfg]) => 
     label: cfg.label,
 }));
 
-export const findGrupo = (grupos = [], id) =>
-    grupos.find((g) => g.id === id) || null;
+export const GROUP_ICON_OPTIONS = [
+    { value: 'Users', label: 'Personas' },
+    { value: 'Heart', label: 'Corazón' },
+    { value: 'Star', label: 'Estrella' },
+    { value: 'Sparkles', label: 'Destellos' },
+    { value: 'Wine', label: 'Copa / Brindis' },
+    { value: 'dress', label: 'Ilustración Vestido' },
+    { value: 'shirt', label: 'Ilustración Camisa' },
+];
 
-export const grupoLabel = (grupos = [], id) => {
+export const findGroup = (groups = [], id) => groups.find((g) => g.id === id) || null;
+
+export const getGroupLabel = (groups = [], id) => {
     if (!id) return '—';
-    const g = findGrupo(grupos, id);
-    return g ? g.nombre : id;
+    const g = findGroup(groups, id);
+    return g ? g.name : id;
 };
 
-export const grupoBadgeClass = (grupos = [], id) => {
-    const g = findGrupo(grupos, id);
+export const getGroupBadgeClass = (groups = [], id) => {
+    const g = findGroup(groups, id);
     return GROUP_COLORS[g?.color]?.badge || GROUP_COLORS.gray.badge;
 };
 
-export const grupoColorStyle = (color) =>
-    GROUP_COLORS[color] || GROUP_COLORS.gray;
+export const getGroupColorStyle = (color) => GROUP_COLORS[color] || GROUP_COLORS.gray;

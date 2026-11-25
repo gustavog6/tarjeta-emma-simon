@@ -39,7 +39,7 @@ const PhotoViewerModal = ({ isOpen, onClose, photos = [], currentIndex = 0, onCh
             const blobUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = blobUrl;
-            a.download = `boda-recuerdo-${photo.id || 'foto'}.jpg`;
+            a.download = `recuerdo-evento-${photo.id || 'foto'}.jpg`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -49,14 +49,13 @@ const PhotoViewerModal = ({ isOpen, onClose, photos = [], currentIndex = 0, onCh
         }
     };
 
-    const autorTexto =
-        photo.autor ||
-        (photo.invitados ? `${photo.invitados.nombre} ${photo.invitados.apellido}` : 'Recuerdo de la boda');
+    const authorLabel =
+        photo.author_name ||
+        (photo.guests ? `${photo.guests.first_name} ${photo.guests.last_name}` : 'Recuerdo del evento');
 
     return (
         <AnimatePresence>
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 safe-overlay">
-                {/* Backdrop */}
                 <motion.div
                     className="absolute inset-0 bg-black/80 modal-backdrop"
                     initial={{ opacity: 0 }}
@@ -65,18 +64,16 @@ const PhotoViewerModal = ({ isOpen, onClose, photos = [], currentIndex = 0, onCh
                     onClick={onClose}
                 />
 
-                {/* Modal Window */}
                 <motion.div
                     className="relative z-10 max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col border border-primary/20 modal-sheet"
                     initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.92, opacity: 0 }}
                 >
-                    {/* Header */}
                     <div className="p-4 px-6 bg-background/95 flex justify-between items-center border-b border-gray-100">
                         <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
                             <User size={16} className="text-primary shrink-0" />
-                            <span className="truncate font-medium">{autorTexto}</span>
+                            <span className="truncate font-medium">{authorLabel}</span>
                             {hasMultiple && (
                                 <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full font-semibold shrink-0">
                                     {safeIndex + 1} / {list.length}
@@ -92,7 +89,6 @@ const PhotoViewerModal = ({ isOpen, onClose, photos = [], currentIndex = 0, onCh
                         </button>
                     </div>
 
-                    {/* Image Container + Flechas */}
                     <div className="flex-1 overflow-hidden bg-black/5 flex items-center justify-center p-2 min-h-[300px] max-h-[65vh] relative select-none">
                         {hasMultiple && (
                             <button
@@ -122,7 +118,6 @@ const PhotoViewerModal = ({ isOpen, onClose, photos = [], currentIndex = 0, onCh
                         )}
                     </div>
 
-                    {/* Footer */}
                     <div className="p-4 px-6 bg-white border-t border-gray-100 flex items-center justify-between gap-3">
                         <span className="text-xs text-gray-400">
                             {photo.created_at

@@ -1,26 +1,28 @@
-# Invitación Digital para Bodas (v2) 💍
+# Plantilla de Invitación Digital y Gestión de Eventos ✨
 
-Plantilla moderna, interactiva y configurable para invitaciones de boda y eventos, construida con **React 19**, **Vite**, **Tailwind CSS**, **Framer Motion** y **Supabase**.
+Plantilla web reutilizable, interactiva y **100% agnóstica al tipo de evento** (bodas, cumpleaños, fiestas de gala, almuerzos corporativos, aniversarios, graduaciones o fiestas privadas), con control de acceso por pases, confirmación de asistencia (RSVP) y panel administrativo en tiempo real.
+
+Construida con **React 19**, **Vite**, **Tailwind CSS**, **Framer Motion**, **ExcelJS**, **jsPDF** y **Supabase**.
 
 ---
 
-## ✨ Características
+## ✨ Características Principales
 
-- 🔒 **Acceso por enlace personalizado (`?ref=UUID`):** Privacidad garantizada mediante RPC segura. Sin token válido no se muestra la invitación.
-- 💌 **Overlay de bienvenida con control de música:** Música activada por defecto con botón claro para silenciar antes de entrar, más reproductor flotante.
-- 📅 **Save The Date + Cuenta regresiva en vivo:** Descarga de evento a calendario (`.ics`) y generador de **banner 9:16 para historias**.
-- 📍 **Ubicaciones y mapas:** Tarjetas interactivas con modales de Google Maps embebidos y enlaces directos.
-- ⏳ **Itinerario:** Línea de tiempo visual con íconos configurables desde el panel.
-- 🍽️ **RSVP Inteligente y Atómico:**
-  - Límite de acompañantes por invitado (`1 + slots_totales`) validado tanto en UI como en base de datos.
-  - Nombre, apellido y menú completo (plato fuerte + contornos) por cada asistente.
-  - Confirmación atómica mediante función RPC en Supabase + envío por WhatsApp.
-- 🎁 **Mesa de regalos:** Pago Móvil y Binance Pay con copiado rápido al portapapeles.
-- 📸 **Galería compartida:** Subida de fotos comprimidas en el cliente, moderación manual y visor ampliado con descarga.
-- 🛡️ **Panel de administración protegido con Supabase Auth (`?admin=true`):**
-  - Confirmaciones en tabla con filas anidadas, agregar acompañantes/titular, reiniciar confirmación sin borrar al invitado, exportación a **Excel (.xlsx)** y **PDF (.pdf)**.
-  - Gestión completa de invitados y envío de invitaciones por WhatsApp con vista previa editable.
-  - Moderación de fotos y pestaña de **Configuración Global** guardada en Supabase.
+- 🎭 **Presets por Tipo de Evento + Personalización Total:** Adapta automáticamente el tono de los textos, WhatsApp, calendario `.ics` y banner 9:16 (*Boda*, *Cumpleaños*, *Gala*, *Corporativo*, *Aniversario*, *Graduación*, *Casual* o *Personalizado*), admitiendo **1 o 2 anfitriones**.
+- 🔒 **Control de Acceso por Token (`?ref=UUID`):** Validación segura vía RPC en Supabase (`get_guest_by_token`). Sin enlace válido no se expone la información privada del evento.
+- 💌 **Bienvenida Interactiva + Música Ambiental:** Portada de ingreso con control inmediato de audio y reproductor flotante.
+- 📅 **Save The Date + Cuenta Regresiva:** Descarga de recordatorio `.ics` para calendario y generador en canvas de **banner vertical 9:16** listo para compartir en historias.
+- 📍 **Ubicaciones Físicas y Virtuales:** Tarjetas con Google Maps embebido para sedes presenciales y soporte para transmisiones en vivo o videollamadas.
+- ⏳ **Programa / Itinerario:** Línea de tiempo dinámica con selector de íconos desde el panel.
+- 🍽️ **RSVP Atómico con Control de Cupos:**
+  - Capacidad estricta por invitación (`1 + extra_passes`) validada en UI y mediante triggers/RPC (`submit_rsvp`) en PostgreSQL.
+  - Si existe un único grupo de invitados configurado, el asistente omite automáticamente el paso de selección de grupo.
+  - Selección individual de plato principal y acompañamientos por asistente + confirmación vía WhatsApp.
+- 🎁 ** Regalos / Aportes:** Cuentas bancarias, Pago Móvil o transferencias digitales con copiado rápido al portapapeles.
+- 📸 **Galería Colaborativa Moderada:** Compresión en cliente antes de subir al bucket `event-gallery`, moderación de estado (`pending`, `approved`, `rejected`) y visor a pantalla completa.
+- 🛡️ **Panel Administrativo con Supabase Auth (`?admin=true`):**
+  - Esquema **100% relacional normalizado en inglés** (cero columnas JSONB en tablas, claves foráneas reales y políticas RLS estrictas).
+  - Tabla de confirmaciones con filas anidadas, edición individual, reinicio seguro (`reset_guest_rsvp`) y exportación con diseño unificado a **Excel (.xlsx)** y **PDF (.pdf)**.
 
 ---
 
@@ -29,7 +31,6 @@ Plantilla moderna, interactiva y configurable para invitaciones de boda y evento
 ### 1. Instalar dependencias
 
 ```bash
-git checkout invitacion-v2
 npm install
 ```
 
@@ -48,13 +49,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_tu_clave_aqui
 
 ### 3. Base de datos y seguridad (Supabase)
 
-Ejecuta en **SQL Editor** en orden estricto:
-1. `supabase/001_initial.sql`
-2. `supabase/002_storage.sql`
-3. `supabase/003_configuracion.sql`
-4. `supabase/004_integridad.sql`
-
-Luego crea la cuenta de los novios en **Authentication → Users** y desactiva el registro público (*Allow new users to sign up*). Consulta [supabase/SETUP.md](supabase/SETUP.md) para los pasos detallados.
+Ejecuta las migraciones de `supabase/` en orden estricto hasta `supabase/009_agnostic_event_schema.sql`, crea el usuario administrador en **Authentication → Users** y desactiva el registro público. Revisa la guía paso a paso en [supabase/SETUP.md](supabase/SETUP.md).
 
 ### 4. Ejecutar en desarrollo
 
@@ -64,6 +59,11 @@ npm run dev
 
 ---
 
-## 🎨 Personalización del Evento
+## 🗄️ Arquitectura de Datos (Supabase)
 
-Toda la información del evento vive en **Supabase** y se administra desde la pestaña **Configuración** del panel (`?admin=true`). `src/config/evento.js` solo conserva la estructura neutra y los ajustes locales (`musica.src` y `galeria.habilitada`).
+Toda la configuración y operación del evento reside en tablas relacionales normalizadas en inglés:
+- `event_settings` — Ajustes generales, anfitriones, fechas, tipo de evento y plantillas dinámicas.
+- `guest_groups` — Grupos/categorías de invitados con color, ícono y teléfono de contacto.
+- `guests` — Lista de invitados titulares, `access_token`, `group_id` y `extra_passes`.
+- `rsvp_attendees` — Asistentes confirmados vinculados a `guests`, `menu_main_courses` y `menu_sides`.
+- `event_locations`, `schedule_items`, `menu_main_courses`, `menu_sides`, `payment_accounts`, `special_mentions`, `gallery_photos`.

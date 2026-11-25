@@ -1,16 +1,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { UserRound } from 'lucide-react';
-import { useConfig } from '../context/ConfigContext';
-import { INVITATION_LIMITS, clampText } from '../config/invitationLimits';
-import vestido from '../assets/vestido-verde.png';
-import camisa from '../assets/camisa-verde.png';
+import { useEventConfig } from '../context/EventConfigContext';
+import { EVENT_LIMITS, clampText } from '../config/eventLimits';
+import attireOptionA from '../assets/attire-option-a.png';
+import attireOptionB from '../assets/attire-option-b.png';
 
 const DressCode = () => {
-    const { config } = useConfig();
-    const tipo = clampText(config.vestimenta?.tipo, INVITATION_LIMITS.vestimenta.tipoMax);
+    const { config } = useEventConfig();
+    const label = clampText(config.dressCode?.label, EVENT_LIMITS.dressCode.labelMax);
 
-    if (!tipo) return null;
+    if (!label) return null;
 
     return (
         <motion.div
@@ -21,18 +21,18 @@ const DressCode = () => {
                 <UserRound size={32} />
             </div>
             <h3 className="text-3xl sm:text-4xl mb-2 font-heading">Código de Vestimenta</h3>
-            <p className="font-base text-gray-500 mb-2 break-anywhere">{tipo}</p>
+            <p className="font-base text-gray-500 mb-2 break-anywhere">{label}</p>
 
             <div className="flex justify-center gap-8 mt-6">
                 <div className="flex flex-col items-center gap-2">
                     <div className="w-14 h-14 bg-pink-50 rounded-full flex items-center justify-center border border-pink-100 shadow-sm overflow-hidden">
-                        <img src={vestido} alt="Vestido" className="w-10 h-10 object-contain" />
+                        <img src={attireOptionA} alt="Opción Damas" className="w-10 h-10 object-contain" />
                     </div>
                     <span className="font-bold text-gray-500 text-sm">Damas</span>
                 </div>
                 <div className="flex flex-col items-center gap-2">
                     <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100 shadow-sm overflow-hidden">
-                        <img src={camisa} alt="Camisa" className="w-10 h-10 object-contain" />
+                        <img src={attireOptionB} alt="Opción Caballeros" className="w-10 h-10 object-contain" />
                     </div>
                     <span className="font-bold text-gray-500 text-sm">Caballeros</span>
                 </div>

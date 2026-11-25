@@ -1,15 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useConfig } from '../context/ConfigContext';
-import { INVITATION_LIMITS, clampText } from '../config/invitationLimits';
-import ManoElegante from '../assets/emmasimonmanoelegante.png';
+import { useEventConfig } from '../context/EventConfigContext';
+import { EVENT_LIMITS, clampText } from '../config/eventLimits';
+import decorativeEmblem from '../assets/decorative-emblem.png';
 
 const QuoteSection = () => {
-    const { config } = useConfig();
-    const texto = clampText(config.textos?.quote?.texto, INVITATION_LIMITS.quote.textoMax);
-    const firma = clampText(config.textos?.quote?.firma, INVITATION_LIMITS.quote.firmaMax);
+    const { config } = useEventConfig();
+    const quote = clampText(config.copy?.closing?.quote, EVENT_LIMITS.closing.quoteMax);
+    const signature = clampText(config.copy?.closing?.signature, EVENT_LIMITS.closing.signatureMax);
 
-    if (!texto && !firma) return null;
+    if (!quote && !signature) return null;
 
     return (
         <section className="py-16 px-6 bg-background relative overflow-x-clip flex items-center justify-center">
@@ -25,7 +25,7 @@ const QuoteSection = () => {
                     transition={{ duration: 1 }}
                     className="mb-8 flex justify-center"
                 >
-                    <img src={ManoElegante} alt="Decoración" className="w-40 h-40 sm:w-48 sm:h-48 aspect-square object-contain" />
+                    <img src={decorativeEmblem} alt="Decoración" className="w-40 h-40 sm:w-48 sm:h-48 aspect-square object-contain" />
                 </motion.div>
 
                 <motion.div
@@ -35,16 +35,16 @@ const QuoteSection = () => {
                     transition={{ delay: 0.3, duration: 1 }}
                     className="min-w-0"
                 >
-                    {texto && (
+                    {quote && (
                         <p className="font-body text-xl sm:text-2xl md:text-3xl lg:text-4xl text-gray-600 font-light italic leading-relaxed mb-10 break-anywhere">
-                            {texto}
+                            {quote}
                         </p>
                     )}
-                    {firma && (
+                    {signature && (
                         <div className="flex flex-col items-center">
                             <div className="h-[1px] w-12 bg-primary/30 mb-6" />
                             <p className="font-heading text-3xl md:text-4xl text-primary tracking-wide break-anywhere">
-                                {firma}
+                                {signature}
                             </p>
                         </div>
                     )}
