@@ -10,9 +10,10 @@ import PhotoViewerModal from './PhotoViewerModal';
 const PREVIEW_LIMIT = EVENT_LIMITS.gallery.previewMax;
 export const GALLERY_BUCKET = 'event-gallery';
 
-/** Resolves public URL supporting both `event-gallery` and legacy `galeria` paths */
+/** Resolves public URL supporting `event-gallery`, legacy `galeria`, and direct seed URLs */
 export function resolvePhotoPublicUrl(storagePath = '') {
     if (!storagePath) return '';
+    if (/^(https?:|data:)/i.test(storagePath)) return storagePath;
     if (storagePath.startsWith('legacy:')) {
         return supabase.storage.from('galeria').getPublicUrl(storagePath.slice(7)).data.publicUrl;
     }

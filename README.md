@@ -49,7 +49,10 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_tu_clave_aqui
 
 ### 3. Base de datos y seguridad (Supabase)
 
-Ejecuta las migraciones de `supabase/` en orden estricto hasta `supabase/009_agnostic_event_schema.sql`, crea el usuario administrador en **Authentication → Users** y desactiva el registro público. Revisa la guía paso a paso en [supabase/SETUP.md](supabase/SETUP.md).
+- **Para un proyecto nuevo o demo comercial:** ejecuta únicamente `supabase/000_definitive_schema_and_demo_seed.sql` en el **SQL Editor** de Supabase.
+- **Para migrar un proyecto existente:** ejecuta las migraciones históricas hasta `supabase/009_agnostic_event_schema.sql`.
+
+Luego crea el usuario administrador en **Authentication → Users** y desactiva el registro público. Revisa la guía paso a paso en [supabase/SETUP.md](supabase/SETUP.md).
 
 ### 4. Ejecutar en desarrollo
 

@@ -7,9 +7,16 @@
 3. Guarda la contraseña de la base de datos
 4. Espera a que el proyecto se inicialice (~2 min)
 
-## 2. Ejecutar migraciones en orden
+## 2. Inicializar la base de datos
 
-Ve a **SQL Editor** en el dashboard de Supabase y ejecuta **en orden estricto**:
+Ve a **SQL Editor** en el dashboard de Supabase:
+
+### Opción A — Proyecto nuevo / Plantilla comercial lista para vender (Recomendado)
+Ejecuta **únicamente** este archivo maestro:
+- `supabase/000_definitive_schema_and_demo_seed.sql` *(crea de cero la arquitectura relacional definitiva 100% en inglés, bucket `event-gallery`, triggers, RPCs, políticas RLS y carga datos demo neutros con 7 fotos de stock y 3 casos de invitados listos para demostración).*
+
+### Opción B — Proyecto existente con datos previos (Migración progresiva)
+Si vienes de una base de datos anterior, ejecuta **en orden estricto**:
 
 1. `supabase/001_initial.sql`
 2. `supabase/002_storage.sql`
@@ -20,6 +27,11 @@ Ve a **SQL Editor** en el dashboard de Supabase y ejecuta **en orden estricto**:
 7. `supabase/007_limites_integridad.sql`
 8. `supabase/008_normalizacion_relacional.sql`
 9. `supabase/009_agnostic_event_schema.sql` *(esquema 100% agnóstico en inglés, relacional sin JSONB, presets por tipo de evento, bucket `event-gallery` y políticas RLS estrictas)*
+
+> **Utilidades adicionales de prueba:**
+> - `supabase/010_backup_current_data.sql` — Guarda una copia íntegra en el esquema privado `event_backup`.
+> - `supabase/011_stress_test_max_limits_seed.sql` — Limpia y carga el escenario de estrés llevando todos los límites visuales al máximo.
+> - `supabase/012_restore_backed_up_data.sql` — Restaura los datos guardados en `010`.
 
 > **Nota sobre RLS:** Si el editor SQL de Supabase muestra la advertencia preventiva sobre Row Level Security, elige **Run and enable RLS**. Todas las tablas incluyen políticas explícitas para lectura pública controlada y administración autenticada.
 

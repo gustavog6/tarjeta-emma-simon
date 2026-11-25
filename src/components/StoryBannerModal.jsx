@@ -243,7 +243,7 @@ const StoryBannerModal = ({ isOpen, onClose }) => {
                             className="w-full py-3 rounded-full bg-primary text-white font-bold text-xs uppercase tracking-wider shadow-md hover:bg-secondary transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                             <Download size={16} />
-                            {downloading ? 'Generando imagen...' : 'Descargar para Instagram / WhatsApp'}
+                            {downloading ? 'Generando imagen...' : 'Descargar para compartir'}
                         </button>
                         <p className="text-[10px] text-gray-400">
                             Descarga la imagen lista en tamaño ideal (1080x1920) para compartir en tus historias.

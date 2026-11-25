@@ -389,7 +389,7 @@ const AdminPanel = ({ user, onLogout }) => {
                 if (guestPhotos.length > 0) {
                     const currentBucketPaths = guestPhotos
                         .map((p) => p.storage_path)
-                        .filter((sp) => sp && !sp.startsWith('legacy:'));
+                        .filter((sp) => sp && !sp.startsWith('legacy:') && !/^(https?:|data:)/i.test(sp));
                     const legacyBucketPaths = guestPhotos
                         .map((p) => p.storage_path)
                         .filter((sp) => sp && sp.startsWith('legacy:'))
